@@ -1,9 +1,27 @@
 {
   "name": "event-storage-http",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "HTTP API layer for node-event-storage",
+  "keywords": [
+    "event-storage",
+    "event-sourcing",
+    "eventstore",
+    "http",
+    "ndjson"
+  ],
+  "homepage": "https://github.com/albe/node-event-storage-http",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/albe/node-event-storage-http.git"
+  },
+  "bugs": {
+    "url": "https://github.com/albe/node-event-storage-http/issues"
+  },
+  "files": [
+    "src/**/*.js",
+    "README.md"
+  ],
   "exports": {
     ".": "./src/index.js"
   },
@@ -15,8 +33,18 @@
   "engines": {
     "node": ">=18.0"
   },
+  "license": "MIT",
+  "maintainers": [
+    {
+      "name": "Alexander Berl",
+      "email": "a.berl@outlook.com"
+    }
+  ],
   "peerDependencies": {
     "event-storage": ">=1.0.0"
+  },
+  "devDependencies": {
+    "event-storage": "^1.1.0"
   },
   "dependencies": {
     "express": "^5.2.1"

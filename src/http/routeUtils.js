@@ -1,5 +1,5 @@
-import { CommitCondition, ExpectedVersion } from '../../../index.js';
-import { matches } from '../../../src/metadataUtil.js';
+import { CommitCondition, ExpectedVersion } from 'event-storage';
+import { matchesDocument } from './matcher.js';
 import { HttpError } from './errors.js';
 
 const readOptionNames = new Set(['from', 'until', 'forwards', 'backwards']);
@@ -51,7 +51,7 @@ function createPayloadMetadataPredicate(matcher) {
     if (!matcher) {
         return null;
     }
-    return (payload, metadata) => matches({ payload, metadata }, matcher);
+    return (payload, metadata) => matchesDocument({ payload, metadata }, matcher);
 }
 
 function parseCondition(value) {

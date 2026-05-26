@@ -1,4 +1,4 @@
-import { OptimisticConcurrencyError } from '../../../index.js';
+import { OptimisticConcurrencyError } from 'event-storage';
 
 const jsonContentType = 'application/json; charset=utf-8';
 
