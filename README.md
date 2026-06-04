@@ -2,6 +2,8 @@
 
 HTTP API layer for [`event-storage`](https://www.npmjs.com/package/event-storage) — exposes an EventStore instance as a set of REST endpoints over NDJSON streaming.
 
+Requires `event-storage >= 1.3.0`.
+
 ## What and why
 
 `event-storage-http` bridges a Node.js `EventStore` instance and any HTTP client. It is designed for setups where the event store lives in a **dedicated backend service** that multiple consumers — frontends, microservices, serverless functions, or other runtimes — need to reach over the network without a direct Node.js dependency.
@@ -77,7 +79,7 @@ Stream, join, category, and query reads return `application/x-ndjson`. These end
 
 Query responses also expose a serialized optimistic-concurrency condition in the `x-event-store-query-condition` response header so clients can pass it back to `POST /streams/{stream}/commit`.
 
-`start` and `end` are accepted wherever a revision boundary is expected. Matchers are JSON object matchers using the same shape as the core storage matchers (`{ stream, payload, metadata }`).
+`start` and `end` are accepted wherever a revision boundary is expected. Matchers are JSON object matchers using the same shape as the core storage matchers (`{ stream, payload, metadata }`). The HTTP layer reuses the canonical matcher implementation from `event-storage`.
 
 ### Consumer endpoints
 
@@ -106,6 +108,7 @@ On startup, `EventStoreHttpApi` calls `eventStore.scanConsumers()` once to pre-p
 
 Raw-mode matcher notes:
 
+- Object matchers are evaluated using the same core matcher semantics as `event-storage`, including nested equality, array OR values, and scalar operators (`$gt`, `$gte`, `$lt`, `$lte`, `$eq`, `$ne`).
 - Object matchers are evaluated against compact JSON bytes (no parsing in the HTTP layer).
 - Function matchers in raw mode receive a raw document `Buffer`.
 - Raw object matchers require the default compact JSON serializer format.

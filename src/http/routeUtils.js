@@ -1,5 +1,4 @@
-import { CommitCondition, ExpectedVersion } from 'event-storage';
-import { matchesDocument } from './matcher.js';
+import { CommitCondition, ExpectedVersion, matches as matchesDocument } from 'event-storage';
 import { HttpError } from './errors.js';
 
 const readOptionNames = new Set(['from', 'until', 'forwards', 'backwards']);

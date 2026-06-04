@@ -217,6 +217,26 @@ test('GET /query returns NDJSON and exposes a serialized commit condition header
     }
 });
 
+test('GET /query supports operator object matchers from core event-storage', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [
+            { type: 'OrderPlaced', amount: 50 },
+            { type: 'OrderPlaced', amount: 150 }
+        ]);
+
+        const filter = encodeURIComponent(JSON.stringify({ payload: { amount: { $gte: 100 } } }));
+        const response = await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter}`);
+        assert.equal(response.status, 200);
+
+        const events = await parseNdjson(response);
+        assert.equal(events.length, 1);
+        assert.equal(events[0].payload.amount, 150);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('PUT /consumers/:identifier/stream/:stream and GET /consumers endpoints expose durable consumers', async () => {
     const fixture = await createFixture();
     try {
