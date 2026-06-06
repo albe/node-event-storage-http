@@ -4,7 +4,7 @@ import path from 'path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'events';
-import EventStore from '../../index.js';
+import EventStore from 'event-storage';
 import EventStoreHttpApi from '../src/EventStoreHttpApi.js';
 import HttpEventStream from '../src/HttpEventStream.js';
 
