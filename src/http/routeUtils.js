@@ -1,4 +1,4 @@
-import { CommitCondition, ExpectedVersion, matches as matchesDocument } from 'event-storage';
+import { CommitCondition, ExpectedVersion } from 'event-storage';
 import { HttpError } from './errors.js';
 
 const readOptionNames = new Set(['from', 'until', 'forwards', 'backwards']);
@@ -46,13 +46,6 @@ function parseExpectedVersion(value) {
     throw new HttpError(400, 'expectedVersion must be a number, "any", or "empty".');
 }
 
-function createPayloadMetadataPredicate(matcher) {
-    if (!matcher) {
-        return null;
-    }
-    return (payload, metadata) => matchesDocument({ payload, metadata }, matcher);
-}
-
 function parseCondition(value) {
     if (value === undefined || value === null) {
         return null;
@@ -70,7 +63,7 @@ function parseCondition(value) {
     const matcher = parseMatcher(condition.matcher, 'condition.matcher');
     return new CommitCondition(
         condition.types,
-        createPayloadMetadataPredicate(matcher),
+        matcher,
         condition.noneMatchAfter
     );
 }
