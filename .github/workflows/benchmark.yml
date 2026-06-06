@@ -12,10 +12,6 @@ jobs:
     permissions:
       contents: read
 
-    defaults:
-      run:
-        working-directory: event-storage-http
-
     steps:
       - uses: actions/checkout@v6
         with:
@@ -36,7 +32,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: event-storage-http-benchmark-output
-          path: event-storage-http/benchmark-output.txt
+          path: benchmark-output.txt
 
       - name: Add benchmark output to job summary
         run: |
