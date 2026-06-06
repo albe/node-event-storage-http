@@ -1,6 +1,6 @@
 {
   "name": "event-storage-http",
-  "version": "0.1.0",
+  "version": "1.3.0",
   "type": "module",
   "description": "HTTP API layer for node-event-storage",
   "keywords": [
