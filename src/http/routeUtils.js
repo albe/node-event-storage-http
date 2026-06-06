@@ -295,7 +295,6 @@ export {
     buildConsumerName,
     commitAsync,
     consumerNameToStream,
-    createPayloadMetadataPredicate,
     getQueryValues,
     parseCondition,
     parseExpectedVersion,
