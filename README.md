@@ -128,7 +128,7 @@ or
 }
 ```
 
-`GET /streams` returns all known streams from the in-memory stream registry, including `stream`, `closed`, `length`, and `metadata`.
+`GET /streams` returns all known streams from the in-memory stream registry, including `stream`, `closed`, `version`, and `metadata`.
 
 `GET /streams/{stream}[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]` returns NDJSON events for one stream.
 

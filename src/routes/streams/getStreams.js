@@ -4,10 +4,10 @@ function registerGetStreamsRoute(app, eventStore) {
     app.get('/streams', (request, response) => {
         const streams = Object.entries(eventStore.streams)
             .filter(([stream]) => !stream.startsWith('_'))
-            .map(([stream, { index,  closed }]) => ({
+            .map(([stream, { index, closed }]) => ({
                 stream,
                 closed: closed ?? false,
-                length: index.length,
+                version: index.length,
                 metadata: index.metadata
             }));
 

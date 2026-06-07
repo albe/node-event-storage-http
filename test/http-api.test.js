@@ -164,7 +164,7 @@ test('PUT /streams/:stream creates matcher streams and GET /streams/:stream retu
     }
 });
 
-test('GET /streams lists stream name, closed state, length, and metadata', async () => {
+test('GET /streams lists stream name, closed state, version, and metadata', async () => {
     const fixture = await createFixture();
     try {
         await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
@@ -182,12 +182,12 @@ test('GET /streams lists stream name, closed state, length, and metadata', async
 
         const orders = streamsByName.get('orders-1');
         assert.equal(orders.closed, false);
-        assert.equal(orders.length, fixture.eventStore.streams['orders-1'].index.length);
+        assert.equal(orders.version, fixture.eventStore.streams['orders-1'].index.length);
         assert.deepEqual(orders.metadata, fixture.eventStore.streams['orders-1'].index.metadata);
 
         const users = streamsByName.get('users-1');
         assert.equal(users.closed, true);
-        assert.equal(users.length, fixture.eventStore.streams['users-1'].index.length);
+        assert.equal(users.version, fixture.eventStore.streams['users-1'].index.length);
         assert.deepEqual(users.metadata, fixture.eventStore.streams['users-1'].index.metadata);
     } finally {
         await destroyFixture(fixture);
