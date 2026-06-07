@@ -5,6 +5,11 @@ const readOptionNames = new Set(['from', 'until', 'forwards', 'backwards']);
 const streamNamePattern = /^[A-Za-z0-9][A-Za-z0-9_]*(?:[\/.-][A-Za-z0-9][A-Za-z0-9_]*)*$/;
 const consumerIdentifierPattern = /^[A-Za-z0-9_-]+$/;
 
+/**
+ * @param {string} raw Raw JSON text (must not be null/undefined).
+ * @param {string} what Logical source label used in error text.
+ * @returns {any} Parsed JSON value.
+ */
 function parseJson(raw, what) {
     try {
         return JSON.parse(raw);
@@ -13,6 +18,11 @@ function parseJson(raw, what) {
     }
 }
 
+/**
+ * @param {object|string|undefined} value Matcher candidate value.
+ * @param {string} source Source label used in error messages.
+ * @returns {object|null} Parsed matcher object, or null when value is empty.
+ */
 function parseMatcher(value, source) {
     if (value === undefined || value === null || value === '') {
         return null;
@@ -24,6 +34,10 @@ function parseMatcher(value, source) {
     return matcher;
 }
 
+/**
+ * @param {number|string|undefined|null} value Expected version value.
+ * @returns {number} Parsed expected version constant/number.
+ */
 function parseExpectedVersion(value) {
     if (value === undefined || value === null) {
         return ExpectedVersion.Any;
@@ -46,6 +60,10 @@ function parseExpectedVersion(value) {
     throw new HttpError(400, 'expectedVersion must be a number, "any", or "empty".');
 }
 
+/**
+ * @param {object|string|undefined} value Condition object or JSON string.
+ * @returns {CommitCondition|null} Parsed commit condition or null when omitted.
+ */
 function parseCondition(value) {
     if (value === undefined || value === null) {
         return null;
@@ -68,6 +86,11 @@ function parseCondition(value) {
     );
 }
 
+/**
+ * @param {CommitCondition} condition Commit condition instance.
+ * @param {object|undefined} [matcher=undefined] Optional matcher to include.
+ * @returns {string} JSON string representation.
+ */
 function serializeCondition(condition, matcher = null) {
     return JSON.stringify({
         types: condition.types,
@@ -76,6 +99,11 @@ function serializeCondition(condition, matcher = null) {
     });
 }
 
+/**
+ * @param {string|undefined} value Revision token.
+ * @param {string} name Parameter label.
+ * @returns {number|'start'|'end'|undefined} Parsed revision.
+ */
 function parseRevision(value, name) {
     if (value === undefined) {
         return undefined;
@@ -96,6 +124,11 @@ function parseRevision(value, name) {
     throw new HttpError(400, `${name} must be an integer, "start", or "end".`);
 }
 
+/**
+ * @param {string|number} value Candidate number.
+ * @param {string} name Parameter label.
+ * @returns {number} Positive integer value.
+ */
 function parsePositiveInteger(value, name) {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -104,6 +137,11 @@ function parsePositiveInteger(value, name) {
     return parsed;
 }
 
+/**
+ * @param {string|undefined} value Stream name.
+ * @param {string} [source='stream'] Source label.
+ * @returns {string} Validated stream name.
+ */
 function parseStreamName(value, source = 'stream') {
     if (typeof value !== 'string' || value === '') {
         throw new HttpError(400, `${source} must not be empty.`);
@@ -114,6 +152,11 @@ function parseStreamName(value, source = 'stream') {
     return value;
 }
 
+/**
+ * @param {string|undefined} value Consumer identifier.
+ * @param {string} [source='identifier'] Source label.
+ * @returns {string} Validated identifier.
+ */
 function parseConsumerIdentifier(value, source = 'identifier') {
     if (typeof value !== 'string' || value === '') {
         throw new HttpError(400, `${source} must not be empty.`);
@@ -124,6 +167,11 @@ function parseConsumerIdentifier(value, source = 'identifier') {
     return value;
 }
 
+/**
+ * @param {string[]} segments URL path segments.
+ * @param {number|undefined} [startIndex=0] Segment offset.
+ * @returns {{from?: number|'start'|'end'|undefined, until?: number|'start'|'end'|undefined, direction?: 'forwards'|'backwards'|undefined, amount?: number|undefined}} Parsed range options.
+ */
 function parseSegmentOptions(segments, startIndex = 0) {
     const options = {};
     for (let index = startIndex; index < segments.length; index += 2) {
@@ -160,6 +208,12 @@ function parseSegmentOptions(segments, startIndex = 0) {
     return options;
 }
 
+/**
+ * @param {number|'start'|'end'|undefined} boundary Boundary token.
+ * @param {number} fallback Default numeric fallback.
+ * @param {number} length Stream length.
+ * @returns {number} Resolved numeric boundary.
+ */
 function resolveBoundary(boundary, fallback, length) {
     if (boundary === undefined) {
         return fallback;
@@ -173,6 +227,11 @@ function resolveBoundary(boundary, fallback, length) {
     return boundary;
 }
 
+/**
+ * @param {number} length Stream/global length.
+ * @param {{from?: number|'start'|'end'|undefined, until?: number|'start'|'end'|undefined, direction?: 'forwards'|'backwards'|undefined, amount?: number|undefined}|undefined} [options={}] Parsed range options.
+ * @returns {{from: number, until: number}} Inclusive read window.
+ */
 function buildReadWindow(length, options = {}) {
     const lower = resolveBoundary(options.from, 1, length);
     const upper = resolveBoundary(options.until, length, length);
@@ -192,6 +251,10 @@ function buildReadWindow(length, options = {}) {
     return { from, until };
 }
 
+/**
+ * @param {string|undefined} [rawPath=''] Raw relative path tail.
+ * @returns {string[]} Decoded path segments.
+ */
 function splitPathSegments(rawPath = '') {
     return rawPath
         .split('/')
@@ -199,10 +262,18 @@ function splitPathSegments(rawPath = '') {
         .map(segment => decodeURIComponent(segment));
 }
 
+/**
+ * @param {string|undefined} [rawPath=''] Raw option path.
+ * @returns {{from?: number|'start'|'end'|undefined, until?: number|'start'|'end'|undefined, direction?: 'forwards'|'backwards'|undefined, amount?: number|undefined}} Parsed options.
+ */
 function parseReadOptions(rawPath = '') {
     return parseSegmentOptions(splitPathSegments(rawPath));
 }
 
+/**
+ * @param {string|undefined} rawPath Stream path including optional range suffix.
+ * @returns {{resourceName: string, options: {from?: number|'start'|'end'|undefined, until?: number|'start'|'end'|undefined, direction?: 'forwards'|'backwards'|undefined, amount?: number|undefined}}}
+ */
 function splitReadStreamPath(rawPath) {
     const segments = splitPathSegments(rawPath);
     let optionStart = segments.length;
@@ -219,6 +290,10 @@ function splitReadStreamPath(rawPath) {
     };
 }
 
+/**
+ * @param {string|undefined} rawPath Consumer stream path with optional `/from/:n`.
+ * @returns {{resourceName: string, from: number}} Parsed target stream and starting revision.
+ */
 function splitConsumerStreamPath(rawPath) {
     const segments = splitPathSegments(rawPath);
     let from = 0;
@@ -233,6 +308,14 @@ function splitConsumerStreamPath(rawPath) {
     return { resourceName, from };
 }
 
+/**
+ * @param {import('event-storage').EventStore} eventStore EventStore instance.
+ * @param {string} streamName Target stream name.
+ * @param {object[]|object} events Events to commit.
+ * @param {number|CommitCondition} expectedVersion Expected version / condition.
+ * @param {object|undefined} metadata Commit metadata.
+ * @returns {Promise<object>} Commit object.
+ */
 function commitAsync(eventStore, streamName, events, expectedVersion, metadata) {
     return new Promise((resolve, reject) => {
         try {
@@ -243,12 +326,20 @@ function commitAsync(eventStore, streamName, events, expectedVersion, metadata) 
     });
 }
 
+/**
+ * @param {import('event-storage').EventStore} eventStore EventStore instance.
+ * @returns {Promise<Array<{name: string, stream: string, identifier: string}>>} Parsed consumer entries.
+ */
 function scanConsumersAsync(eventStore) {
     return new Promise((resolve, reject) => {
         eventStore.scanConsumers((error, consumers) => error ? reject(error) : resolve(consumers));
     });
 }
 
+/**
+ * @param {string} consumerName Persisted consumer file stem.
+ * @returns {{identifier: string, stream: string, name: string}} Parsed consumer mapping.
+ */
 function consumerNameToStream(consumerName) {
     const splitIndex = consumerName.lastIndexOf('.');
     if (splitIndex < 0) {
@@ -265,6 +356,10 @@ function consumerNameToStream(consumerName) {
     return { identifier, stream: indexName.slice(7), name: consumerName };
 }
 
+/**
+ * @param {string|string[]|number|undefined} value Query value or value array.
+ * @returns {string[]} Normalized string list.
+ */
 function getQueryValues(value) {
     if (Array.isArray(value)) {
         return value.flatMap(item => String(item).split(',')).map(item => item.trim()).filter(Boolean);
@@ -275,6 +370,13 @@ function getQueryValues(value) {
     return String(value).split(',').map(item => item.trim()).filter(Boolean);
 }
 
+/**
+ * @param {Promise<void>} promise Readiness promise.
+ * @param {import('express').Request} request Express request.
+ * @param {import('express').Response} response Express response.
+ * @param {import('express').NextFunction} next Express next callback.
+ * @returns {Promise<void>}
+ */
 async function waitForReadyMiddleware(promise, request, response, next) {
     try {
         await promise;
@@ -284,6 +386,11 @@ async function waitForReadyMiddleware(promise, request, response, next) {
     }
 }
 
+/**
+ * @param {string} stream Stream name (`_all` allowed).
+ * @param {string} identifier Consumer identifier.
+ * @returns {string} Persisted consumer name.
+ */
 function buildConsumerName(stream, identifier) {
     return stream === '_all'
         ? `_all.${identifier}`

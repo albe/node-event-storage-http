@@ -194,6 +194,77 @@ test('GET /streams lists stream name, closed state, version, and metadata', asyn
     }
 });
 
+test('GET /streams/:stream with until > version long-polls and streams forward until target version', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const responsePromise = fetch(`${fixture.baseUrl}/streams/orders-1/until/3/from/1`);
+
+        await new Promise(resolve => setTimeout(resolve, 25));
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderConfirmed', orderId: '1' }]);
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderShipped', orderId: '1' }]);
+
+        const response = await responsePromise;
+        assert.equal(response.status, 200);
+        assert.equal(response.headers.get('content-type'), 'application/x-ndjson; charset=utf-8');
+
+        const events = await parseNdjson(response);
+        assert.deepEqual(events.map(event => event.payload.type), ['OrderPlaced', 'OrderConfirmed', 'OrderShipped']);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /streams/:stream with until > version returns 408 on timeout', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-2', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const shortTimeoutApi = new EventStoreHttpApi(fixture.eventStore, { streamPollTimeoutMs: 100 });
+        const shortTimeoutServer = shortTimeoutApi.createServer();
+        await new Promise(resolve => shortTimeoutServer.listen(0, '127.0.0.1', resolve));
+        const shortAddress = shortTimeoutServer.address();
+        const shortBaseUrl = `http://127.0.0.1:${shortAddress.port}`;
+
+        try {
+            // Request from position 2 onwards until version 99. This will timeout since stream only has 1 event.
+            const timeoutResponse = await fetch(`${shortBaseUrl}/streams/orders-2/until/99/from/2`);
+            assert.equal(timeoutResponse.status, 408);
+            const body = await timeoutResponse.json();
+            assert.ok(body.error.includes('did not reach version'));
+        } finally {
+            await new Promise(resolve => shortTimeoutServer.close(resolve));
+        }
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /streams/:stream polling returns 200 when at least one event was emitted before timeout', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-3', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const shortTimeoutApi = new EventStoreHttpApi(fixture.eventStore, { streamPollTimeoutMs: 100 });
+        const shortTimeoutServer = shortTimeoutApi.createServer();
+        await new Promise(resolve => shortTimeoutServer.listen(0, '127.0.0.1', resolve));
+        const shortAddress = shortTimeoutServer.address();
+        const shortBaseUrl = `http://127.0.0.1:${shortAddress.port}`;
+
+        try {
+            const response = await fetch(`${shortBaseUrl}/streams/orders-3/from/1/until/99`);
+            assert.equal(response.status, 200);
+            const events = await parseNdjson(response);
+            assert.deepEqual(events.map(event => event.payload.type), ['OrderPlaced']);
+        } finally {
+            await new Promise(resolve => shortTimeoutServer.close(resolve));
+        }
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('GET /streams/join and /streams/category return joined NDJSON output, including nested categories', async () => {
     const fixture = await createFixture();
     try {
@@ -216,6 +287,54 @@ test('GET /streams/join and /streams/category return joined NDJSON output, inclu
         assert.equal(nestedCategoryResponse.status, 200);
         const nestedCategoryEvents = await parseNdjson(nestedCategoryResponse);
         assert.deepEqual(nestedCategoryEvents.map(event => event.stream), ['orders/eu/1', 'orders/eu/2']);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /streams/join long-poll returns 408 when no in-range event becomes visible', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const shortTimeoutApi = new EventStoreHttpApi(fixture.eventStore, { streamPollTimeoutMs: 100 });
+        const shortTimeoutServer = shortTimeoutApi.createServer();
+        await new Promise(resolve => shortTimeoutServer.listen(0, '127.0.0.1', resolve));
+        const shortAddress = shortTimeoutServer.address();
+        const shortBaseUrl = `http://127.0.0.1:${shortAddress.port}`;
+
+        try {
+            const response = await fetch(`${shortBaseUrl}/streams/join/from/2/until/99?streams=orders-1`);
+            assert.equal(response.status, 408);
+            const body = await response.json();
+            assert.ok(body.error.includes('did not reach version'));
+        } finally {
+            await new Promise(resolve => shortTimeoutServer.close(resolve));
+        }
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /streams/category long-poll returns 200 when at least one event was streamed', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const shortTimeoutApi = new EventStoreHttpApi(fixture.eventStore, { streamPollTimeoutMs: 100 });
+        const shortTimeoutServer = shortTimeoutApi.createServer();
+        await new Promise(resolve => shortTimeoutServer.listen(0, '127.0.0.1', resolve));
+        const shortAddress = shortTimeoutServer.address();
+        const shortBaseUrl = `http://127.0.0.1:${shortAddress.port}`;
+
+        try {
+            const response = await fetch(`${shortBaseUrl}/streams/category/orders/from/1/until/99`);
+            assert.equal(response.status, 200);
+            const events = await parseNdjson(response);
+            assert.deepEqual(events.map(event => event.payload.type), ['OrderPlaced']);
+        } finally {
+            await new Promise(resolve => shortTimeoutServer.close(resolve));
+        }
     } finally {
         await destroyFixture(fixture);
     }
@@ -318,7 +437,7 @@ test('PUT /consumers/:identifier/stream/:stream and GET /consumers endpoints exp
     }
 });
 
-test('GET /consumers/:identifier/until/:minVersion long-polls until the consumer reaches the requested version', async () => {
+test('GET /consumers/:identifier/after/:minVersion long-polls until the consumer reaches the requested version or later', async () => {
     const fixture = await createFixture();
     try {
         await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
@@ -334,7 +453,7 @@ test('GET /consumers/:identifier/until/:minVersion long-polls until the consumer
         });
 
         // The consumer is at position 1; asking for version 1 should respond immediately.
-        const immediateResponse = await fetch(`${fixture.baseUrl}/consumers/poll-reader/until/1`);
+        const immediateResponse = await fetch(`${fixture.baseUrl}/consumers/poll-reader/after/1`);
         assert.equal(immediateResponse.status, 200);
         const immediate = await immediateResponse.json();
         assert.equal(immediate.identifier, 'poll-reader');
@@ -342,7 +461,7 @@ test('GET /consumers/:identifier/until/:minVersion long-polls until the consumer
         assert.ok(immediate.position >= 1);
 
         // Commit a second event while the long-poll is in flight.
-        const pollPromise = fetch(`${fixture.baseUrl}/consumers/poll-reader/until/2`);
+        const pollPromise = fetch(`${fixture.baseUrl}/consumers/poll-reader/after/2`);
         await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderConfirmed', orderId: '1' }]);
 
         const pollResponse = await pollPromise;
@@ -355,7 +474,7 @@ test('GET /consumers/:identifier/until/:minVersion long-polls until the consumer
     }
 });
 
-test('GET /consumers/:identifier/until/:minVersion returns 408 when timeout elapses before version is reached', async () => {
+test('GET /consumers/:identifier/after/:minVersion returns 408 when timeout elapses before version is reached', async () => {
     const fixture = await createFixture();
     try {
         // Create an API instance with a very short timeout so the test doesn't hang.
@@ -377,7 +496,7 @@ test('GET /consumers/:identifier/until/:minVersion returns 408 when timeout elap
             });
 
             // Ask for version 99 which will never be reached within 100ms.
-            const timeoutResponse = await fetch(`${shortBaseUrl}/consumers/timeout-reader/until/99`);
+            const timeoutResponse = await fetch(`${shortBaseUrl}/consumers/timeout-reader/after/99`);
             assert.equal(timeoutResponse.status, 408);
             const body = await timeoutResponse.json();
             assert.ok(body.error.includes('did not reach version'));
@@ -389,10 +508,10 @@ test('GET /consumers/:identifier/until/:minVersion returns 408 when timeout elap
     }
 });
 
-test('GET /consumers/:identifier/until/:minVersion returns 404 for unknown consumer', async () => {
+test('GET /consumers/:identifier/after/:minVersion returns 404 for unknown consumer', async () => {
     const fixture = await createFixture();
     try {
-        const response = await fetch(`${fixture.baseUrl}/consumers/no-such-consumer/until/1`);
+        const response = await fetch(`${fixture.baseUrl}/consumers/no-such-consumer/after/1`);
         assert.equal(response.status, 404);
     } finally {
         await destroyFixture(fixture);
@@ -465,7 +584,7 @@ test('GET /consumers/:identifier returns running consumer from registry without 
 
         // Let the consumer catch up.
         await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderConfirmed', orderId: '1' }]);
-        await fetch(`${fixture.baseUrl}/consumers/reg-reader/until/2`);
+        await fetch(`${fixture.baseUrl}/consumers/reg-reader/after/2`);
 
         // GET should return the registry entry (live position/state).
         const getResponse = await fetch(`${fixture.baseUrl}/consumers/reg-reader`);

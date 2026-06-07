@@ -24,7 +24,7 @@ const CONDITION_HEADER = 'x-event-store-query-condition';
  */
 class HttpEventStream {
     /**
-     * @param {Response} response A Fetch API Response whose body is NDJSON.
+     * @param {Response} response A Fetch API Response whose body is NDJSON. Must not be null/undefined.
      */
     constructor(response) {
         this.commitCondition = null;
@@ -44,6 +44,7 @@ class HttpEventStream {
      * per line.
      *
      * @yields {object}
+     * @returns {AsyncGenerator<object, void, undefined>}
      */
     async *[Symbol.asyncIterator]() {
         const reader = this.body.getReader();
@@ -85,7 +86,7 @@ class HttpEventStream {
     /**
      * Collect all events into an array.
      *
-     * @returns {Promise<object[]>}
+     * @returns {Promise<object[]>} Array of parsed events (never null/undefined).
      */
     async toArray() {
         const events = [];

@@ -4,14 +4,24 @@ import { parseConsumerIdentifier, parsePositiveInteger } from '../../http/routeU
 /**
  * Register the long-poll consumer endpoint.
  *
- * Waits until the named consumer has processed at least `minVersion` events, then
+ * Waits until the named consumer has processed at least `minVersion`, then
  * responds with the consumer's current position and state.  If the consumer does
  * not reach `minVersion` within `timeoutMs`, a 408 Request Timeout is returned.
  *
  * The consumer must be registered in the EventStore's `consumers` map (i.e. started via PUT).
+ *
+ * @param {import('express').Express} app Express app instance (must not be null/undefined).
+ * @param {import('event-storage').EventStore} eventStore EventStore instance.
+ * @param {number|undefined} [timeoutMs=10_000] Poll timeout in milliseconds.
+ * @returns {void}
  */
-function registerGetConsumerUntilRoute(app, eventStore, timeoutMs = 10_000) {
-    app.get('/consumers/:identifier/until/:minVersion', async (request, response) => {
+function registerGetConsumerAfterRoute(app, eventStore, timeoutMs = 10_000) {
+    /**
+     * @param {import('express').Request} request Express request.
+     * @param {import('express').Response} response Express response.
+     * @returns {Promise<void>}
+     */
+    const handleGetConsumerAfter = async (request, response) => {
         const identifier = parseConsumerIdentifier(request.params.identifier);
         const minVersion = parsePositiveInteger(request.params.minVersion, 'minVersion');
 
@@ -25,17 +35,26 @@ function registerGetConsumerUntilRoute(app, eventStore, timeoutMs = 10_000) {
         }
 
         await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
+            /** @returns {void} */
+            const onTimeout = () => {
                 cleanup();
                 reject(new HttpError(408, `Consumer "${identifier}" did not reach version ${minVersion} within ${timeoutMs}ms.`));
-            }, timeoutMs);
+            };
+            const timer = setTimeout(onTimeout, timeoutMs);
 
+            /**
+             * @returns {void}
+             */
             function cleanup() {
                 clearTimeout(timer);
                 consumer.removeListener('progress', onProgress);
                 consumer.removeListener('error', onError);
             }
 
+            /**
+             * @param {number} position Current consumer position.
+             * @returns {void}
+             */
             function onProgress(position) {
                 if (position < minVersion) {
                     return;
@@ -44,6 +63,10 @@ function registerGetConsumerUntilRoute(app, eventStore, timeoutMs = 10_000) {
                 resolve();
             }
 
+            /**
+             * @param {Error} err Consumer error.
+             * @returns {void}
+             */
             function onError(err) {
                 cleanup();
                 reject(new HttpError(500, `Consumer "${identifier}" encountered an error: ${err.message}`));
@@ -54,7 +77,9 @@ function registerGetConsumerUntilRoute(app, eventStore, timeoutMs = 10_000) {
         });
 
         sendJson(response, 200, { identifier, stream: consumer.streamName, position: consumer.position, state: consumer.state });
-    });
+    };
+
+    app.get('/consumers/:identifier/after/:minVersion', handleGetConsumerAfter);
 }
 
-export default registerGetConsumerUntilRoute;
+export default registerGetConsumerAfterRoute;

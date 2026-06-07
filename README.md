@@ -53,9 +53,13 @@ const api = new EventStoreHttpApi(eventStore, {
     // processing immediately without a client issuing a PUT first.
     autoStartConsumers: true,
 
-    // How long (ms) GET /consumers/:id/until/:version waits before responding
+    // How long (ms) GET /consumers/:id/after/:version waits before responding
     // with 408 Request Timeout.  Defaults to 10 000.
-    consumerPollTimeoutMs: 30_000
+    consumerPollTimeoutMs: 30_000,
+
+    // How long (ms) stream/join/category reads wait for the next event when
+    // long-polling is active before timing out. Defaults to 10 000.
+    streamPollTimeoutMs: 30_000
 });
 
 api.listen(3000, () => console.log('Event store listening on port 3000'));
@@ -73,7 +77,7 @@ api.listen(3000, () => console.log('Event store listening on port 3000'));
 - `GET /query[/from/{revision}]?types=...`
 - `PUT /consumers/{identifier}/stream/{stream}[/from/{revision}]`
 - `GET /consumers/{identifier}`
-- `GET /consumers/{identifier}/until/{minVersion}`
+- `GET /consumers/{identifier}/after/{minVersion}`
 - `GET /consumers`
 
 Stream, join, category, and query reads return `application/x-ndjson`. These endpoints use the core EventStore raw mode, so event documents are streamed as newline-delimited JSON buffers directly to the HTTP response.
@@ -139,6 +143,8 @@ or
 - Query params:
   - `filter` (optional): matcher JSON object (URL-encoded when passed as string).
 
+**Long-polling:** When `until` is greater than the current visible version (or `from` exceeds it), stream/join/category reads enter long-poll mode. The API streams everything it can see immediately and only waits while the next in-range event is missing. If at least one event is emitted, the response status is `200` and the response closes on timeout when no further event arrives. If no event could be emitted at all before timeout, the server responds with HTTP `408 Request Timeout`.
+
 `GET /streams/{stream}/version` returns `{ stream, version }`.
 
 `GET /streams/join[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]?streams=...` returns one merged NDJSON stream over all listed streams.
@@ -147,7 +153,9 @@ or
   - `streams` (required): comma-separated stream names.
   - `filter` (optional): matcher JSON object.
 
+
 `GET /streams/category/{category}[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]` returns NDJSON events for all streams in a category (`{category}-...` or `{category}/...`).
+
 
 ### Consumer endpoints
 
@@ -155,10 +163,10 @@ or
 
 `GET /consumers/{identifier}` returns the live position and state of the named consumer from the in-memory registry. Returns `404` if the consumer is not registered.
 
-`GET /consumers/{identifier}/until/{minVersion}` is a long-poll endpoint that blocks until the named consumer's position reaches `minVersion`, then responds with the consumer's current position and state. If the consumer does not advance to `minVersion` within the configured timeout (default 10 s, configurable via `options.consumerPollTimeoutMs`), the server responds with HTTP `408 Request Timeout`. The consumer must be registered in the event store's consumer registry (via `PUT` or by the startup scan) before calling this endpoint.
+`GET /consumers/{identifier}/after/{minVersion}` is a long-poll endpoint that blocks until the named consumer's position reaches `minVersion` or later, then responds with the consumer's current position and state. The returned position is therefore guaranteed to be at least the requested version and may be higher. If the consumer does not advance to `minVersion` within the configured timeout (default 10 s, configurable via `options.consumerPollTimeoutMs`), the server responds with HTTP `408 Request Timeout`. The consumer must be registered in the event store's consumer registry (via `PUT` or by the startup scan) before calling this endpoint.
 
 ```http
-GET /consumers/orders-reader/until/5
+GET /consumers/orders-reader/after/5
 ```
 
 ```json

@@ -1,8 +1,18 @@
 import { HttpError, sendJson } from '../../http/errors.js';
 import { parseConsumerIdentifier } from '../../http/routeUtils.js';
 
+/**
+ * @param {import('express').Express} app Express app instance (must not be null/undefined).
+ * @param {import('event-storage').EventStore} eventStore EventStore instance.
+ * @returns {void}
+ */
 function registerGetConsumerRoute(app, eventStore) {
-    app.get('/consumers/:identifier', (request, response) => {
+    /**
+     * @param {import('express').Request} request Express request.
+     * @param {import('express').Response} response Express response.
+     * @returns {void}
+     */
+    const handleGetConsumer = (request, response) => {
         const identifier = parseConsumerIdentifier(request.params.identifier);
         const consumer = eventStore.getConsumer(identifier);
         if (!consumer) {
@@ -14,7 +24,9 @@ function registerGetConsumerRoute(app, eventStore) {
             position: consumer.position,
             state: consumer.state
         });
-    });
+    };
+
+    app.get('/consumers/:identifier', handleGetConsumer);
 }
 
 export default registerGetConsumerRoute;

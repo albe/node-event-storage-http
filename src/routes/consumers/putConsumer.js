@@ -22,21 +22,32 @@ function compileHandler(handlerCode) {
     if (typeof handlerCode !== 'string' || !handlerCode.trim()) {
         throw new HttpError(400, 'Consumer payload must include a "handler" function string.');
     }
+    let fn;
     try {
         // Run in an empty context so the handler cannot reach process, require, global, etc.
         // CodeQL [js/code-injection] Intentional: executes user-supplied handler in an isolated vm context with no globals. This endpoint requires a trusted caller (documented above).
-        const fn = vm.runInNewContext('(' + handlerCode + ')', Object.freeze({}));
-        if (typeof fn !== 'function') {
-            throw new Error('Not a function');
-        }
-        return fn;
+        fn = vm.runInNewContext('(' + handlerCode + ')', Object.freeze({}));
     } catch {
         throw new HttpError(400, 'handler must be a valid JavaScript function.');
     }
+    if (typeof fn !== 'function') {
+        throw new HttpError(400, 'handler must be a valid JavaScript function.');
+    }
+    return fn;
 }
 
+/**
+ * @param {import('express').Express} app Express app instance (must not be null/undefined).
+ * @param {import('event-storage').EventStore} eventStore EventStore instance.
+ * @returns {void}
+ */
 function registerPutConsumerRoute(app, eventStore) {
-    app.put(/^\/consumers\/([^/]+)\/stream\/(.+)$/, async (request, response) => {
+    /**
+     * @param {import('express').Request} request Express request.
+     * @param {import('express').Response} response Express response.
+     * @returns {Promise<void>}
+     */
+    const handlePutConsumer = async (request, response) => {
         const identifier = parseConsumerIdentifier(decodeURIComponent(request.params[0]));
         const { resourceName: stream, from } = splitConsumerStreamPath(request.params[1]);
 
@@ -70,6 +81,10 @@ function registerPutConsumerRoute(app, eventStore) {
         }
 
         // Register the compiled handler: called for every event, may update state.
+        /**
+         * @param {object} event Consumer event payload.
+         * @returns {void}
+         */
         consumer.on('data', (event) => {
             try {
                 const newState = handlerFn(event, consumer.state);
@@ -81,6 +96,10 @@ function registerPutConsumerRoute(app, eventStore) {
             }
         });
 
+        /**
+         * @param {Error} err Consumer processing error.
+         * @returns {void}
+         */
         consumer.on('error', (err) => {
             console.error('[EventStoreHttpApi] Consumer "%s" error:', consumerName, err);
             consumer.stop();
@@ -96,7 +115,9 @@ function registerPutConsumerRoute(app, eventStore) {
             position: consumer.position,
             state: consumer.state
         });
-    });
+    };
+
+    app.put(/^\/consumers\/([^/]+)\/stream\/(.+)$/, handlePutConsumer);
 }
 
 export default registerPutConsumerRoute;

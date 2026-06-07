@@ -2,10 +2,20 @@ import { sendJson } from '../../http/errors.js';
 
 const SCAN_DEBOUNCE_MS = 5_000;
 
+/**
+ * @param {import('express').Express} app Express app instance (must not be null/undefined).
+ * @param {import('event-storage').EventStore} eventStore EventStore instance.
+ * @returns {void}
+ */
 function registerGetConsumersRoute(app, eventStore) {
     let lastScanAt = 0;
 
-    app.get('/consumers', (request, response) => {
+    /**
+     * @param {import('express').Request} request Express request.
+     * @param {import('express').Response} response Express response.
+     * @returns {void}
+     */
+    const handleGetConsumers = (request, response) => {
         // Return the current in-memory registry immediately.
         const consumers = [...eventStore.consumers.entries()].map(([identifier, consumer]) => ({
             identifier,
@@ -26,7 +36,9 @@ function registerGetConsumersRoute(app, eventStore) {
         }
 
         sendJson(response, 200, { consumers });
-    });
+    };
+
+    app.get('/consumers', handleGetConsumers);
 }
 
 export default registerGetConsumersRoute;

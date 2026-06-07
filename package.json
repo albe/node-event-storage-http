@@ -1,6 +1,6 @@
 {
   "name": "event-storage-http",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "type": "module",
   "description": "HTTP API layer for node-event-storage",
   "keywords": [
@@ -20,10 +20,15 @@
   },
   "files": [
     "src/**/*.js",
+    "index.d.ts",
     "README.md"
   ],
+  "types": "./index.d.ts",
   "exports": {
-    ".": "./src/index.js"
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./src/index.js"
+    }
   },
   "scripts": {
     "bench:http": "node ./bench/bench-http-layer.js",
@@ -41,10 +46,10 @@
     }
   ],
   "peerDependencies": {
-    "event-storage": ">=1.3.0"
+    "event-storage": ">=1.3.1"
   },
   "devDependencies": {
-    "event-storage": "^1.3.0"
+    "event-storage": "^1.3.1"
   },
   "dependencies": {
     "express": "^5.2.1"

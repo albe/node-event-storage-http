@@ -1,8 +1,18 @@
 import { HttpError, sendJson } from '../../http/errors.js';
 import { parseMatcher, parseStreamName } from '../../http/routeUtils.js';
 
+/**
+ * @param {import('express').Express} app Express app instance (must not be null/undefined).
+ * @param {import('event-storage').EventStore} eventStore EventStore instance.
+ * @returns {void}
+ */
 function registerPutStreamRoute(app, eventStore) {
-    app.put(/^\/streams\/(.+)$/, (request, response) => {
+    /**
+     * @param {import('express').Request} request Express request.
+     * @param {import('express').Response} response Express response.
+     * @returns {void}
+     */
+    const handlePutStream = (request, response) => {
         const streamName = parseStreamName(decodeURIComponent(request.params[0]));
         const matcher = parseMatcher(request.body?.matcher ?? request.body, 'matcher');
         if (!matcher) {
@@ -13,7 +23,9 @@ function registerPutStreamRoute(app, eventStore) {
             stream: streamName,
             version: stream.version
         });
-    });
+    };
+
+    app.put(/^\/streams\/(.+)$/, handlePutStream);
 }
 
 export default registerPutStreamRoute;
