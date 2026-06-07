@@ -82,6 +82,73 @@ Query responses also expose a serialized optimistic-concurrency condition in the
 
 `start` and `end` are accepted wherever a revision boundary is expected. Matchers are JSON object matchers using the same shape as the core storage matchers (`{ stream, payload, metadata }`). The HTTP layer reuses the canonical matcher implementation from `event-storage`.
 
+### Stream endpoints
+
+`POST /streams/{stream}/commit` appends events to a stream.
+
+- Path params:
+  - `stream`: target stream name.
+- Body (JSON object):
+  - `events` (required): non-empty array of event payload objects.
+  - `expectedVersion` (optional): integer, `"any"`, or `"empty"`.
+  - `condition` (optional): serialized DCB commit condition (`{ types, noneMatchAfter, matcher? }`).
+  - `metadata` (optional): object merged into commit metadata for all events.
+
+```json
+{
+  "events": [
+    { "type": "OrderPlaced", "orderId": "1" }
+  ],
+  "expectedVersion": "any",
+  "metadata": { "requestId": "req-1" }
+}
+```
+
+`PUT /streams/{stream}` creates a stream index (matcher stream).
+
+- Path params:
+  - `stream`: name of the stream to create.
+- Body (JSON object): matcher definition, either directly as the request body or wrapped in `matcher`.
+
+```json
+{
+  "stream": ["orders-1", "orders-2"],
+  "payload": { "type": "OrderPlaced" }
+}
+```
+
+or
+
+```json
+{
+  "matcher": {
+    "stream": ["orders-1", "orders-2"],
+    "payload": { "type": "OrderPlaced" }
+  }
+}
+```
+
+`GET /streams` returns all known streams from the in-memory stream registry, including `stream`, `closed`, `length`, and `metadata`.
+
+`GET /streams/{stream}[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]` returns NDJSON events for one stream.
+
+- Path params:
+  - `stream`: stream name.
+  - `from` / `until` (optional): revision boundary (`start`, `end`, or integer).
+  - `forwards` / `backwards` (optional): max number of events in selected direction.
+- Query params:
+  - `filter` (optional): matcher JSON object (URL-encoded when passed as string).
+
+`GET /streams/{stream}/version` returns `{ stream, version }`.
+
+`GET /streams/join[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]?streams=...` returns one merged NDJSON stream over all listed streams.
+
+- Query params:
+  - `streams` (required): comma-separated stream names.
+  - `filter` (optional): matcher JSON object.
+
+`GET /streams/category/{category}[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]` returns NDJSON events for all streams in a category (`{category}-...` or `{category}/...`).
+
 ### Consumer endpoints
 
 `PUT /consumers/{identifier}/stream/{stream}[/from/{revision}]` starts a durable consumer that is kept running in memory and registered in the EventStore's internal `consumers` map (keyed by `identifier`). Re-issuing the PUT replaces the existing consumer and restarts from the new handler and state.
