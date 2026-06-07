@@ -65,6 +65,7 @@ api.listen(3000, () => console.log('Event store listening on port 3000'));
 
 - `POST /streams/{stream}/commit`
 - `PUT /streams/{stream}`
+- `GET /streams`
 - `GET /streams/{stream}[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]`
 - `GET /streams/{stream}/version`
 - `GET /streams/join[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]?streams=...`

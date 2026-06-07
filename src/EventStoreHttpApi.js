@@ -10,6 +10,7 @@ import registerPutConsumerRoute from './routes/consumers/putConsumer.js';
 import registerGetQueryRoute from './routes/query/getQuery.js';
 import registerGetCategoryRoute from './routes/streams/getCategory.js';
 import registerGetJoinRoute from './routes/streams/getJoin.js';
+import registerGetStreamsRoute from './routes/streams/getStreams.js';
 import registerGetStreamRoute from './routes/streams/getStream.js';
 import registerGetVersionRoute from './routes/streams/getVersion.js';
 import registerPostCommitRoute from './routes/streams/postCommit.js';
@@ -50,6 +51,7 @@ class EventStoreHttpApi {
         registerGetQueryRoute(app, this.eventStore);
         registerGetJoinRoute(app, this.eventStore);
         registerGetCategoryRoute(app, this.eventStore);
+        registerGetStreamsRoute(app, this.eventStore);
         registerPostCommitRoute(app, this.eventStore);
         registerGetVersionRoute(app, this.eventStore);
         registerGetStreamRoute(app, this.eventStore);

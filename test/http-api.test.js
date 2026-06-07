@@ -164,6 +164,36 @@ test('PUT /streams/:stream creates matcher streams and GET /streams/:stream retu
     }
 });
 
+test('GET /streams lists stream name, closed state, length, and metadata', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderConfirmed', orderId: '1' }]);
+        await commitAsync(fixture.eventStore, 'users-1', [{ type: 'UserCreated', userId: '1' }]);
+        fixture.eventStore.closeEventStream('users-1');
+
+        const response = await fetch(`${fixture.baseUrl}/streams`);
+        assert.equal(response.status, 200);
+
+        const body = await response.json();
+        const streamsByName = new Map(body.streams.map(stream => [stream.stream, stream]));
+
+        assert.equal(streamsByName.has('_all'), false);
+
+        const orders = streamsByName.get('orders-1');
+        assert.equal(orders.closed, false);
+        assert.equal(orders.length, fixture.eventStore.streams['orders-1'].index.length);
+        assert.deepEqual(orders.metadata, fixture.eventStore.streams['orders-1'].index.metadata);
+
+        const users = streamsByName.get('users-1');
+        assert.equal(users.closed, true);
+        assert.equal(users.length, fixture.eventStore.streams['users-1'].index.length);
+        assert.deepEqual(users.metadata, fixture.eventStore.streams['users-1'].index.metadata);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('GET /streams/join and /streams/category return joined NDJSON output, including nested categories', async () => {
     const fixture = await createFixture();
     try {
