@@ -79,12 +79,15 @@ api.listen(3000, () => console.log('Event store listening on port 3000'));
 - `GET /consumers/{identifier}`
 - `GET /consumers/{identifier}/after/{minVersion}`
 - `GET /consumers`
+- `GET /health`
 
 Stream, join, category, and query reads return `application/x-ndjson`. These endpoints use the core EventStore raw mode, so event documents are streamed as newline-delimited JSON buffers directly to the HTTP response.
 
 Query responses also expose a serialized optimistic-concurrency condition in the `x-event-store-query-condition` response header so clients can pass it back to `POST /streams/{stream}/commit`.
 
 `start` and `end` are accepted wherever a revision boundary is expected. Matchers are JSON object matchers using the same shape as the core storage matchers (`{ stream, payload, metadata }`). The HTTP layer reuses the canonical matcher implementation from `event-storage`.
+
+`GET /health` returns a small JSON snapshot for liveness and basic diagnostics. It includes whether the store appears open, whether it is currently writable, store length, stream/consumer counts, `event-storage` version (best effort), and selected runtime information from the Express/Node process.
 
 ### Stream endpoints
 

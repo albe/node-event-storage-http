@@ -84,6 +84,100 @@ test('POST /streams/:stream/commit stores events and GET /streams/:stream/versio
     }
 });
 
+test('GET /health reports basic store and runtime information', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        await fetch(`${fixture.baseUrl}/consumers/orders-reader/stream/orders-1/from/1`, {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                state: {},
+                handler: '() => ({})'
+            })
+        });
+
+        const response = await fetch(`${fixture.baseUrl}/health`);
+        assert.equal(response.status, 200);
+        const body = await response.json();
+
+        assert.equal(body.status, 'ok');
+        assert.equal(body.store.open, true);
+        assert.equal(body.store.writable, true);
+        assert.equal(body.store.length, 1);
+        assert.ok(body.store.streams >= 1);
+        assert.ok(body.store.consumers >= 1);
+        assert.ok(body.store.eventStorageVersion === null || typeof body.store.eventStorageVersion === 'string');
+        assert.equal(body.server.env, 'development');
+        assert.equal(typeof body.server.uptimeSeconds, 'number');
+        assert.equal(body.server.nodeVersion, process.version);
+
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /health reports writable=false when the API wraps a read-only event store', async () => {
+    const storageDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'event-storage-http-health-ro-'));
+    let writableStore;
+    let readOnlyStore;
+    let server;
+    try {
+        writableStore = new EventStore({
+            storageDirectory,
+            typeAccessor: 'type'
+        });
+        await once(writableStore, 'ready');
+        await commitAsync(writableStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        writableStore.close();
+
+        readOnlyStore = new EventStore({
+            storageDirectory,
+            readOnly: true,
+            typeAccessor: 'type'
+        });
+        await once(readOnlyStore, 'ready');
+
+        const api = new EventStoreHttpApi(readOnlyStore);
+        server = api.createServer();
+        await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+        const address = server.address();
+        const baseUrl = `http://127.0.0.1:${address.port}`;
+
+        const response = await fetch(`${baseUrl}/health`);
+        assert.equal(response.status, 200);
+        const body = await response.json();
+        assert.equal(body.status, 'ok');
+        assert.equal(body.store.writable, false);
+        assert.equal(body.store.length, 1);
+    } finally {
+        if (server) {
+            await new Promise(resolve => server.close(resolve));
+        }
+        if (readOnlyStore) {
+            readOnlyStore.close();
+        }
+        if (writableStore) {
+            writableStore.close();
+        }
+        await fs.rm(storageDirectory, { recursive: true, force: true });
+    }
+});
+
+test('GET /health returns 503 when the event store is closed', async () => {
+    const fixture = await createFixture();
+    try {
+        fixture.eventStore.close();
+        const response = await fetch(`${fixture.baseUrl}/health`);
+        assert.equal(response.status, 503);
+        const body = await response.json();
+        assert.equal(body.status, 'degraded');
+        assert.equal(body.store.open, false);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('HTTP API validates stream names and consumer identifiers', async () => {
     const fixture = await createFixture();
     try {

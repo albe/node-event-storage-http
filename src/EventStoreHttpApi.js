@@ -7,6 +7,7 @@ import registerGetConsumerRoute from './routes/consumers/getConsumer.js';
 import registerGetConsumersRoute from './routes/consumers/getConsumers.js';
 import registerGetConsumerAfterRoute from './routes/consumers/getConsumerAfter.js';
 import registerPutConsumerRoute from './routes/consumers/putConsumer.js';
+import registerGetHealthRoute from './routes/health/getHealth.js';
 import registerGetQueryRoute from './routes/query/getQuery.js';
 import registerGetCategoryRoute from './routes/streams/getCategory.js';
 import registerGetJoinRoute from './routes/streams/getJoin.js';
@@ -68,6 +69,7 @@ class EventStoreHttpApi {
         const app = express();
         app.disable('x-powered-by');
         app.use(express.json({ limit: '1mb' }));
+        registerGetHealthRoute(app, this.eventStore);
         app.use((request, response, next) => waitForReadyMiddleware(this.ready, request, response, next));
 
         registerGetConsumersRoute(app, this.eventStore);
