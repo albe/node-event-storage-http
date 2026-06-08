@@ -337,26 +337,6 @@ function scanConsumersAsync(eventStore) {
 }
 
 /**
- * @param {string} consumerName Persisted consumer file stem.
- * @returns {{identifier: string, stream: string, name: string}} Parsed consumer mapping.
- */
-function consumerNameToStream(consumerName) {
-    const splitIndex = consumerName.lastIndexOf('.');
-    if (splitIndex < 0) {
-        throw new HttpError(500, `Invalid consumer name "${consumerName}".`);
-    }
-    const indexName = consumerName.slice(0, splitIndex);
-    const identifier = consumerName.slice(splitIndex + 1);
-    if (indexName === '_all') {
-        return { identifier, stream: '_all', name: consumerName };
-    }
-    if (!indexName.startsWith('stream-')) {
-        throw new HttpError(500, `Unsupported consumer stream "${indexName}".`);
-    }
-    return { identifier, stream: indexName.slice(7), name: consumerName };
-}
-
-/**
  * @param {string|string[]|number|undefined} value Query value or value array.
  * @returns {string[]} Normalized string list.
  */
@@ -401,7 +381,6 @@ export {
     buildReadWindow,
     buildConsumerName,
     commitAsync,
-    consumerNameToStream,
     getQueryValues,
     parseCondition,
     parseExpectedVersion,
