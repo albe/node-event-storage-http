@@ -1,7 +1,6 @@
 import { HttpError } from '../../http/errors.js';
-import { writeNdjson } from '../../http/ndjson.js';
 import { buildReadWindow, parseMatcher, splitReadStreamPath } from '../../http/routeUtils.js';
-import { shouldLongPoll, streamUntilVersion } from '../../http/streamPoll.js';
+import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
 
 /**
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
@@ -10,6 +9,8 @@ import { shouldLongPoll, streamUntilVersion } from '../../http/streamPoll.js';
  * @returns {void}
  */
 function registerGetCategoryRoute(app, eventStore, timeoutMs = 10_000) {
+    const runLongPoll = createLongPollRunner(eventStore, timeoutMs);
+
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
@@ -29,39 +30,21 @@ function registerGetCategoryRoute(app, eventStore, timeoutMs = 10_000) {
 
         const { from, until } = buildReadWindow(eventStore.length, options);
         const version = eventStore.length;
+        const prefixedCategory = `stream-${category}`;
 
-        if (shouldLongPoll(from, until, version)) {
-            const prefixedCategory = `stream-${category}`;
-            try {
-                await streamUntilVersion(response, {
-                    from,
-                    until,
-                    currentVersion: version,
-                    headers: {
-                        'x-event-store-category': category
-                    },
-                    timeoutMs,
-                    eventSource: eventStore.storage,
-                    getAvailableVersionOnIndexAdd: (indexName) => (
-                        indexName === prefixedCategory ||
-                        indexName.startsWith(prefixedCategory + '-') ||
-                        indexName.startsWith(prefixedCategory + '/')
-                            ? eventStore.length
-                            : undefined
-                    ),
-                    createStream: (rangeFrom, rangeUntil) => eventStore.getEventStreamForCategory(category, rangeFrom, rangeUntil, filter, true)
-                });
-            } catch (error) {
-                if (!response.headersSent) {
-                    throw error;
-                }
+        await runLongPoll(response, {
+            range: { from, until, version },
+            headers: { 'x-event-store-category': category },
+            source: {
+                getAvailableVersionOnIndexAdd: (indexName) => (
+                    indexName === prefixedCategory ||
+                    indexName.startsWith(prefixedCategory + '-') ||
+                    indexName.startsWith(prefixedCategory + '/')
+                        ? eventStore.length
+                        : undefined
+                ),
+                createStream: (rangeFrom, rangeUntil) => eventStore.getEventStreamForCategory(category, rangeFrom, rangeUntil, filter, true)
             }
-            return;
-        }
-
-        const categoryStream = eventStore.getEventStreamForCategory(category, from, until, filter, true);
-        await writeNdjson(response, categoryStream, {
-            'x-event-store-category': category
         });
     };
 

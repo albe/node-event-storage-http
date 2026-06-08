@@ -1,7 +1,6 @@
 import { HttpError } from '../../http/errors.js';
-import { writeNdjson } from '../../http/ndjson.js';
 import { buildReadWindow, getQueryValues, parseMatcher, parseReadOptions, parseStreamName } from '../../http/routeUtils.js';
-import { shouldLongPoll, streamUntilVersion } from '../../http/streamPoll.js';
+import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
 
 /**
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
@@ -10,6 +9,8 @@ import { shouldLongPoll, streamUntilVersion } from '../../http/streamPoll.js';
  * @returns {void}
  */
 function registerGetJoinRoute(app, eventStore, timeoutMs = 10_000) {
+    const runLongPoll = createLongPollRunner(eventStore, timeoutMs);
+
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
@@ -26,35 +27,18 @@ function registerGetJoinRoute(app, eventStore, timeoutMs = 10_000) {
         const options = parseReadOptions(rawOptions);
         const { from, until } = buildReadWindow(eventStore.length, options);
         const version = eventStore.length;
+        const joinName = `join:${streamNames.join(',')}`;
+        const indexNames = new Set(streamNames.map(name => `stream-${name}`));
 
-        if (shouldLongPoll(from, until, version)) {
-            const indexNames = new Set(streamNames.map(name => `stream-${name}`));
-            try {
-                await streamUntilVersion(response, {
-                    from,
-                    until,
-                    currentVersion: version,
-                    headers: {
-                        'x-event-store-streams': streamNames.join(',')
-                    },
-                    timeoutMs,
-                    eventSource: eventStore.storage,
-                    getAvailableVersionOnIndexAdd: (indexName) => (
-                        indexNames.has(indexName) ? eventStore.length : undefined
-                    ),
-                    createStream: (rangeFrom, rangeUntil) => eventStore.fromStreams(`join:${streamNames.join(',')}`, streamNames, rangeFrom, rangeUntil, filter, true)
-                });
-            } catch (error) {
-                if (!response.headersSent) {
-                    throw error;
-                }
+        await runLongPoll(response, {
+            range: { from, until, version },
+            headers: { 'x-event-store-streams': streamNames.join(',') },
+            source: {
+                getAvailableVersionOnIndexAdd: (indexName) => (
+                    indexNames.has(indexName) ? eventStore.length : undefined
+                ),
+                createStream: (rangeFrom, rangeUntil) => eventStore.fromStreams(joinName, streamNames, rangeFrom, rangeUntil, filter, true)
             }
-            return;
-        }
-
-        const stream = eventStore.fromStreams(`join:${streamNames.join(',')}`, streamNames, from, until, filter, true);
-        await writeNdjson(response, stream, {
-            'x-event-store-streams': streamNames.join(',')
         });
     };
 
