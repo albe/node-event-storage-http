@@ -65,6 +65,47 @@ const api = new EventStoreHttpApi(eventStore, {
 api.listen(3000, () => console.log('Event store listening on port 3000'));
 ```
 
+### Client helpers
+
+The package also exports lightweight client-side helpers for NDJSON reads and DCB commit-condition handling:
+
+- `HttpEventStream` parses NDJSON response bodies and exposes the optional query condition header as `commitCondition`.
+- `CommitConditionHelper` builds, validates, serializes, and parses `x-event-store-query-condition` values.
+- `MatcherBuilder` builds object matchers with nested paths and operator helpers.
+
+```js
+import { HttpEventStream, CommitConditionHelper, MatcherBuilder } from 'event-storage-http';
+
+const response = await fetch('http://127.0.0.1:3000/query?types=OrderPlaced');
+const stream = new HttpEventStream(response);
+
+const events = await stream.toArray();
+
+const matcher = new MatcherBuilder()
+    .path('payload.orderId').equals('order-1')
+    .path('payload.type').anyOf('OrderPlaced', 'OrderConfirmed')
+    .path('metadata.total').greaterThan(24)
+    .build();
+
+const condition = stream.commitCondition ?? new CommitConditionHelper()
+    .types(['OrderPlaced'])
+    .noneMatchAfter(events.length)
+    .matcher(matcher)
+    .build();
+
+await fetch('http://127.0.0.1:3000/streams/orders-1/commit', {
+    method: 'POST',
+    headers: {
+        'content-type': 'application/json',
+        ...CommitConditionHelper.toHeaders(condition)
+    },
+    body: JSON.stringify({
+        events: [{ type: 'OrderConfirmed', orderId: 'order-1' }],
+        condition
+    })
+});
+```
+
 ## Endpoints
 
 - `POST /streams/{stream}/commit`
