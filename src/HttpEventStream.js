@@ -1,4 +1,4 @@
-const CONDITION_HEADER = 'x-event-store-query-condition';
+import { CommitConditionHelper } from './CommitConditionHelper.js';
 
 /**
  * Client-side wrapper around an HTTP NDJSON response body.
@@ -28,13 +28,10 @@ class HttpEventStream {
      */
     constructor(response) {
         this.commitCondition = null;
-        const header = response.headers?.get?.(CONDITION_HEADER);
-        if (header) {
-            try {
-                this.commitCondition = JSON.parse(header);
-            } catch {
-                // ignore a malformed header
-            }
+        try {
+            this.commitCondition = CommitConditionHelper.fromHeaders(response.headers);
+        } catch {
+            // ignore a malformed header
         }
         this.body = response.body;
     }

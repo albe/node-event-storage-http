@@ -1,4 +1,5 @@
 import { sendJson } from '../../http/errors.js';
+import StorageStatsCollector from "../../StatsCollector.js";
 
 /**
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
@@ -64,6 +65,21 @@ function registerGetHealthRoute(app, eventStore) {
     };
 
     app.get('/health', handleGetHealth);
+
+    /**
+     * @param {import('express').Request} request Express request.
+     * @param {import('express').Response} response Express response.
+     * @returns {void}
+     */
+    const handleGetStats = (request, response) => {
+        const storage = eventStore.storage;
+        const open = isStoreOpen(eventStore);
+        const statsCollector = new StorageStatsCollector(storage);
+
+        sendJson(response, open ? 200 : 503, statsCollector.stats());
+    };
+
+    app.get('/health/stats', handleGetStats);
 }
 
 export default registerGetHealthRoute;

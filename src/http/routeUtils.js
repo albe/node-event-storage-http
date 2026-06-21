@@ -140,11 +140,15 @@ function parsePositiveInteger(value, name) {
 /**
  * @param {string|undefined} value Stream name.
  * @param {string} [source='stream'] Source label.
+ * @param {boolean} [allowAll=false] Allow the reserved `_all` stream name.
  * @returns {string} Validated stream name.
  */
-function parseStreamName(value, source = 'stream') {
+function parseStreamName(value, source = 'stream', allowAll = false) {
     if (typeof value !== 'string' || value === '') {
         throw new HttpError(400, `${source} must not be empty.`);
+    }
+    if (allowAll && value === '_all') {
+        return value;
     }
     if (!streamNamePattern.test(value)) {
         throw new HttpError(400, `${source} must use segments that start with a letter or number and may contain letters, numbers, "-", "_", ".", and "/".`);
@@ -272,9 +276,10 @@ function parseReadOptions(rawPath = '') {
 
 /**
  * @param {string|undefined} rawPath Stream path including optional range suffix.
+ * @param {boolean} [allowAll=false] Allow the reserved `_all` stream name.
  * @returns {{resourceName: string, options: {from?: number|'start'|'end'|undefined, until?: number|'start'|'end'|undefined, direction?: 'forwards'|'backwards'|undefined, amount?: number|undefined}}}
  */
-function splitReadStreamPath(rawPath) {
+function splitReadStreamPath(rawPath, allowAll = false) {
     const segments = splitPathSegments(rawPath);
     let optionStart = segments.length;
     while (optionStart >= 2 && readOptionNames.has(segments[optionStart - 2])) {
@@ -285,7 +290,7 @@ function splitReadStreamPath(rawPath) {
         throw new HttpError(404, 'Unknown route.');
     }
     return {
-        resourceName: parseStreamName(resourceName),
+        resourceName: parseStreamName(resourceName, 'stream', allowAll),
         options: parseSegmentOptions(segments.slice(optionStart))
     };
 }

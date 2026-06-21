@@ -50,10 +50,14 @@ function isValidAvailableVersion(value) {
  * @returns {boolean} True when the stream range indicates visible events for this batch.
  */
 function hasVisibleBatch(stream, batch, isForward) {
-    if (isForward) {
-        return stream.version >= batch.from && stream.minRevision === batch.from;
+    if (isForward ? stream.minRevision !== batch.from : stream.maxRevision !== batch.until) {
+        return false;
     }
-    return stream.version >= batch.from && stream.maxRevision === batch.until;
+    if (stream.next() === false) {
+        return false;
+    }
+    stream.reset();
+    return true;
 }
 
 /**

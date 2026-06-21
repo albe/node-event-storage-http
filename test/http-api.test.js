@@ -117,6 +117,29 @@ test('GET /health reports basic store and runtime information', async () => {
     }
 });
 
+test('GET /health/stats returns storage statistics', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const response = await fetch(`${fixture.baseUrl}/health/stats`);
+        assert.equal(response.status, 200);
+        const body = await response.json();
+
+        assert.equal(typeof body.numPartitions, 'number');
+        assert.equal(typeof body.numIndexes, 'number');
+        assert.equal(typeof body.bytesWritten, 'number');
+        assert.equal(typeof body.partitions, 'object');
+        assert.equal(typeof body.indexes, 'object');
+        assert.ok(body.numPartitions >= 1);
+        assert.ok(body.numIndexes >= 1);
+        assert.ok(Object.keys(body.partitions).length >= 1);
+        assert.ok(Object.keys(body.indexes).length >= 1);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('GET /health reports writable=false when the API wraps a read-only event store', async () => {
     const storageDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'event-storage-http-health-ro-'));
     let writableStore;
@@ -310,6 +333,30 @@ test('GET /streams/:stream with until > version long-polls and streams forward u
     }
 });
 
+test('GET /streams/_all and /streams/_all/version expose the global stream', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        await commitAsync(fixture.eventStore, 'users-1', [{ type: 'UserCreated', userId: '1' }]);
+
+        const streamResponse = await fetch(`${fixture.baseUrl}/streams/_all/from/2/until/2`);
+        assert.equal(streamResponse.status, 200);
+        const events = await parseNdjson(streamResponse);
+        assert.equal(events.length, 1);
+        assert.equal(events[0].stream, 'users-1');
+        assert.equal(events[0].payload.type, 'UserCreated');
+
+        const versionResponse = await fetch(`${fixture.baseUrl}/streams/_all/version`);
+        assert.equal(versionResponse.status, 200);
+        assert.deepEqual(await versionResponse.json(), {
+            stream: '_all',
+            version: 2
+        });
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('GET /streams/:stream with until > version returns 408 on timeout', async () => {
     const fixture = await createFixture();
     try {
@@ -381,6 +428,39 @@ test('GET /streams/join and /streams/category return joined NDJSON output, inclu
         assert.equal(nestedCategoryResponse.status, 200);
         const nestedCategoryEvents = await parseNdjson(nestedCategoryResponse);
         assert.deepEqual(nestedCategoryEvents.map(event => event.stream), ['orders/eu/1', 'orders/eu/2']);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /streams/join rejects _all to avoid redundant full-store joins', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const response = await fetch(`${fixture.baseUrl}/streams/join?streams=_all,orders-1`);
+        assert.equal(response.status, 400);
+        assert.deepEqual(await response.json(), {
+            error: 'streams must not include "_all" for join reads. Use GET /streams/_all instead.'
+        });
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /streams/join over a single stream still applies global revision windows', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        await commitAsync(fixture.eventStore, 'users-1', [{ type: 'UserCreated', userId: '1' }]);
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderConfirmed', orderId: '1' }]);
+
+        const globalMatchResponse = await fetch(`${fixture.baseUrl}/streams/join/from/3/until/3?streams=orders-1`);
+        assert.equal(globalMatchResponse.status, 200);
+        const globalMatch = await parseNdjson(globalMatchResponse);
+        assert.equal(globalMatch.length, 1);
+        assert.equal(globalMatch[0].stream, 'orders-1');
+        assert.equal(globalMatch[0].payload.type, 'OrderConfirmed');
     } finally {
         await destroyFixture(fixture);
     }

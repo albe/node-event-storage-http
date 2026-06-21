@@ -17,7 +17,7 @@ function registerGetStreamRoute(app, eventStore, timeoutMs = 10_000) {
      * @returns {Promise<void>}
      */
     const handleGetStream = async (request, response) => {
-        const { resourceName: streamName, options } = splitReadStreamPath(request.params[0]);
+        const { resourceName: streamName, options } = splitReadStreamPath(request.params[0], true);
         const filter = parseMatcher(request.query.filter, 'filter');
         const version = eventStore.getStreamVersion(streamName);
         if (version === -1) {

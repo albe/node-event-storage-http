@@ -19,9 +19,12 @@ function registerGetJoinRoute(app, eventStore, timeoutMs = 10_000) {
     const handleGetJoin = async (request, response) => {
         const rawOptions = request.params[0] || '';
         const filter = parseMatcher(request.query.filter, 'filter');
-        const streamNames = getQueryValues(request.query.streams).map(streamName => parseStreamName(streamName, 'streams'));
+        const streamNames = getQueryValues(request.query.streams).map(streamName => parseStreamName(streamName, 'streams', true));
         if (streamNames.length === 0) {
             throw new HttpError(400, 'streams query parameter is required.');
+        }
+        if (streamNames.includes('_all')) {
+            throw new HttpError(400, 'streams must not include "_all" for join reads. Use GET /streams/_all instead.');
         }
 
         const options = parseReadOptions(rawOptions);

@@ -13,7 +13,7 @@ function registerGetVersionRoute(app, eventStore) {
      * @returns {void}
      */
     const handleGetVersion = (request, response) => {
-        const streamName = parseStreamName(decodeURIComponent(request.params[0]));
+        const streamName = parseStreamName(decodeURIComponent(request.params[0]), 'stream', true);
         const version = eventStore.getStreamVersion(streamName);
         if (version === -1) {
             throw new HttpError(404, `Stream "${streamName}" does not exist.`);
