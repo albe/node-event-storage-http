@@ -1,6 +1,6 @@
 {
   "name": "event-storage-http",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "type": "module",
   "description": "HTTP API layer for node-event-storage",
   "keywords": [
@@ -36,7 +36,7 @@
     "test": "node --test ./test/*.test.js"
   },
   "engines": {
-    "node": ">=18.0"
+    "node": ">=20.0"
   },
   "license": "MIT",
   "maintainers": [
@@ -46,10 +46,10 @@
     }
   ],
   "peerDependencies": {
-    "event-storage": ">=1.3.1"
+    "event-storage": ">=1.3.4"
   },
   "devDependencies": {
-    "event-storage": "^1.3.1"
+    "event-storage": "^1.3.4"
   },
   "dependencies": {
     "express": "^5.2.1"
