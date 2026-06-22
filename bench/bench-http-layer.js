@@ -4,7 +4,7 @@ import path from 'node:path';
 import { once } from 'node:events';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import EventStoreHttpApi from '../src/EventStoreHttpApi.js';
+import EventStoreHttpApi from '../src/server/EventStoreHttpApi.js';
 
 const host = '127.0.0.1';
 const concurrencyLevels = [1, 2, 4, 8, 16];

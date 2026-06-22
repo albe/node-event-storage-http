@@ -20,20 +20,30 @@
   },
   "files": [
     "src/**/*.js",
-    "index.d.ts",
+    "src/**/*.d.ts",
     "README.md"
   ],
-  "types": "./index.d.ts",
+  "types": "./src/server/index.d.ts",
   "exports": {
+    "./protocol": {
+      "types": "./src/protocol/index.d.ts",
+      "default": "./src/protocol/index.js"
+    },
+    "./client": {
+      "types": "./src/client/index.d.ts",
+      "default": "./src/client/index.js"
+    },
     ".": {
-      "types": "./index.d.ts",
-      "default": "./src/index.js"
+      "types": "./src/server/index.d.ts",
+      "default": "./src/server/index.js"
     }
   },
+  "sideEffects": false,
   "scripts": {
     "bench:http": "node ./bench/bench-http-layer.js",
     "bench:http:write": "node ./bench/bench-http-layer.js write",
-    "test": "node --test ./test/*.test.js"
+    "test": "node --test ./test/*.test.js",
+    "test:imports": "node ./scripts/check-imports.mjs"
   },
   "engines": {
     "node": ">=20.0"
@@ -46,12 +56,19 @@
     }
   ],
   "peerDependencies": {
-    "event-storage": ">=1.3.4"
+    "event-storage": ">=1.3.4",
+    "express": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "event-storage": {
+      "optional": true
+    },
+    "express": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "event-storage": "^1.3.4"
-  },
-  "dependencies": {
+    "event-storage": "^1.3.4",
     "express": "^5.2.1"
   }
 }

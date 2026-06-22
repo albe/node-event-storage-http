@@ -62,8 +62,13 @@ jobs:
 
           # Required files must be present
           REQUIRED=(
-            "package/src/index.js"
-            "package/src/EventStoreHttpApi.js"
+            "package/src/server/index.js"
+            "package/src/server/EventStoreHttpApi.js"
+            "package/src/client/index.js"
+            "package/src/client/index.d.ts"
+            "package/src/protocol/index.js"
+            "package/src/protocol/index.d.ts"
+            "package/index.d.ts"
             "package/README.md"
           )
           for f in "${REQUIRED[@]}"; do
@@ -84,6 +89,9 @@ jobs:
           done
 
           echo "Package contents verified successfully."
+
+      - name: Verify dependency boundaries (protocol/client load no express/server)
+        run: npm run test:imports
 
       - name: Run tests
         run: npm test

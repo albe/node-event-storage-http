@@ -1,4 +1,5 @@
-import { CommitConditionHelper } from './CommitConditionHelper.js';
+import { CommitConditionHelper } from '../protocol/CommitConditionHelper.js';
+import { NdjsonDecoder } from '../protocol/ndjson.js';
 
 /**
  * Client-side wrapper around an HTTP NDJSON response body.
@@ -45,38 +46,33 @@ class HttpEventStream {
      */
     async *[Symbol.asyncIterator]() {
         const reader = this.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
+        const decoder = new NdjsonDecoder();
         try {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) {
-                    const tail = buffer.trim();
-                    if (tail) {
-                        try {
-                            yield JSON.parse(tail);
-                        } catch {
-                            throw new SyntaxError(`HttpEventStream: malformed NDJSON: ${tail}`);
-                        }
-                    }
+                    yield* this.#decodeOrThrow(() => decoder.flush());
                     return;
                 }
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() ?? '';
-                for (const line of lines) {
-                    const trimmed = line.trim();
-                    if (trimmed) {
-                        try {
-                            yield JSON.parse(trimmed);
-                        } catch {
-                            throw new SyntaxError(`HttpEventStream: malformed NDJSON: ${trimmed}`);
-                        }
-                    }
-                }
+                yield* this.#decodeOrThrow(() => decoder.push(value));
             }
         } finally {
             reader.releaseLock();
+        }
+    }
+
+    /**
+     * Run a decoder step, normalizing JSON parse failures into a descriptive
+     * SyntaxError consistent with this class's historical error message.
+     *
+     * @param {() => object[]} step Decoder push/flush invocation.
+     * @returns {object[]} Parsed objects.
+     */
+    #decodeOrThrow(step) {
+        try {
+            return step();
+        } catch (error) {
+            throw new SyntaxError(`HttpEventStream: malformed NDJSON: ${error.message}`);
         }
     }
 

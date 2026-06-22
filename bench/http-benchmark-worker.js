@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks';
-import HttpEventStream from '../src/HttpEventStream.js';
+import HttpEventStream from '../src/client/HttpEventStream.js';
 
 const configuration = JSON.parse(process.argv[2] ?? '{}');
 

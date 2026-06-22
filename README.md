@@ -65,6 +65,41 @@ const api = new EventStoreHttpApi(eventStore, {
 api.listen(3000, () => console.log('Event store listening on port 3000'));
 ```
 
+### Entry points (subpath exports)
+
+The package is split into three layers so client-only code never pulls in `express` or the server stack:
+
+| Import | Loads | Contents |
+| --- | --- | --- |
+| `event-storage-http/protocol` | zero framework, zero server | `MatcherBuilder`, `CommitConditionHelper`, `CONDITION_HEADER`, `eventPosition`, `commitPosition`, `NdjsonDecoder` |
+| `event-storage-http/client` | zero server, zero `express` | `HttpEventStream`, `EventStoreHttpClient` (plus the protocol helpers re-exported) |
+| `event-storage-http` | full server stack incl. `express` | `EventStoreHttpApi`, `createEventStoreHttpServer`, `createEventStoreHttpServerWithApp` (plus all of the above, for backwards compatibility) |
+
+`express` and `event-storage` are declared as **optional peer dependencies**, so a consumer that only imports `/protocol` or `/client` does not have to install `express`.
+
+```js
+// A consumer service that only reads events — no express in its dependency tree.
+import { EventStoreHttpClient } from 'event-storage-http/client';
+
+const client = new EventStoreHttpClient({ baseUrl: 'http://127.0.0.1:3000' });
+const stream = await client.readStream('orders-1', { from: 1 });
+for await (const event of stream) {
+    console.log(event);
+}
+await client.commit('orders-1', [{ type: 'OrderConfirmed', orderId: 'order-1' }]);
+```
+
+To attach the API onto an Express app you already own:
+
+```js
+import express from 'express';
+import { createEventStoreHttpServerWithApp } from 'event-storage-http';
+
+const app = express();
+createEventStoreHttpServerWithApp(eventStore, app); // routes attached; you control listening
+app.listen(3000);
+```
+
 ### Client helpers
 
 The package also exports lightweight client-side helpers for NDJSON reads and DCB commit-condition handling:
@@ -74,7 +109,7 @@ The package also exports lightweight client-side helpers for NDJSON reads and DC
 - `MatcherBuilder` builds object matchers with nested paths and operator helpers.
 
 ```js
-import { HttpEventStream, CommitConditionHelper, MatcherBuilder } from 'event-storage-http';
+import { HttpEventStream, CommitConditionHelper, MatcherBuilder } from 'event-storage-http/client';
 
 const response = await fetch('http://127.0.0.1:3000/query?types=OrderPlaced');
 const stream = new HttpEventStream(response);
@@ -83,7 +118,7 @@ const events = await stream.toArray();
 
 const matcher = new MatcherBuilder()
     .path('payload.orderId').equals('order-1')
-    .path('payload.type').anyOf('OrderPlaced', 'OrderConfirmed')
+    .path('payload.type').isAnyOf('OrderPlaced', 'OrderConfirmed')
     .path('metadata.total').greaterThan(24)
     .build();
 

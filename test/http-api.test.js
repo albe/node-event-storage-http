@@ -5,8 +5,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'events';
 import EventStore from 'event-storage';
-import EventStoreHttpApi from '../src/EventStoreHttpApi.js';
-import HttpEventStream from '../src/HttpEventStream.js';
+import EventStoreHttpApi from '../src/server/EventStoreHttpApi.js';
+import HttpEventStream from '../src/client/HttpEventStream.js';
 
 function commitAsync(eventStore, streamName, events) {
     return new Promise((resolve, reject) => {

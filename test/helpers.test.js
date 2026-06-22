@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CommitConditionHelper, MatcherBuilder } from '../src/index.js';
+import { CommitConditionHelper, MatcherBuilder } from '../src/protocol/index.js';
 
 test('MatcherBuilder builds nested object matchers with operators', () => {
     const matcher = new MatcherBuilder()
