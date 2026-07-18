@@ -236,6 +236,16 @@ class CommitConditionHelper {
         };
     }
 
+    /**
+     * Build a serialized commit condition from either legacy `types` or selector algebra.
+     * Flat non-empty string arrays are treated as legacy `types` for backwards compatibility.
+     * Any nested selector structure (string leaf, nested arrays) is treated as `selector`.
+     *
+     * @param {string[]|string|string[]|Array<unknown>} selectorOrTypes
+     * @param {number} noneMatchAfter
+     * @param {object|undefined} [matcher=undefined]
+     * @returns {object}
+     */
     static create(selectorOrTypes, noneMatchAfter, matcher = undefined) {
         const helper = new CommitConditionHelper()
             .matching(matcher)

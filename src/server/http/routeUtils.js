@@ -233,7 +233,7 @@ function parseStreamName(value, source = 'stream', allowAll = false) {
         return value;
     }
     if (!streamNamePattern.test(value)) {
-        throw new HttpError(400, `${source} must use segments that start with a letter or number and may contain letters, numbers, "_", and separators ${streamNameSeparators.map(separator => `"${separator}"`).join(', ')}.`);
+        throw new HttpError(400, `${source} must use segments that start with a letter or number and may contain letters, numbers, "_", and separators: / : @ ~ + = - # .`);
     }
     return value;
 }

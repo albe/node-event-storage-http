@@ -229,7 +229,7 @@ test('HTTP API validates stream names and consumer identifiers', async () => {
         });
         assert.equal(invalidStreamResponse.status, 400);
         assert.deepEqual(await invalidStreamResponse.json(), {
-            error: 'stream must use segments that start with a letter or number and may contain letters, numbers, "_", and separators "/", ":", "@", "~", "+", "=", "-", "#", ".".'
+            error: 'stream must use segments that start with a letter or number and may contain letters, numbers, "_", and separators: / : @ ~ + = - # .'
         });
 
         const invalidJoinResponse = await fetch(`${fixture.baseUrl}/streams/join?streams=orders..1`);
