@@ -240,6 +240,8 @@ class CommitConditionHelper {
         const helper = new CommitConditionHelper()
             .matching(matcher)
             .noneMatchAfter(noneMatchAfter);
+        // Backwards compatibility: plain string arrays map to legacy `types`,
+        // while nested arrays/strings are treated as selector algebra.
         if (Array.isArray(selectorOrTypes) && selectorOrTypes.every(item => typeof item === 'string' && item !== '')) {
             return helper.types(selectorOrTypes).build();
         }
@@ -248,4 +250,3 @@ class CommitConditionHelper {
 }
 
 export { CommitConditionHelper, MatcherBuilder, CONDITION_HEADER };
-

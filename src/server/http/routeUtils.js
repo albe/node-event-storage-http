@@ -6,12 +6,12 @@ const streamNamePattern = /^[A-Za-z0-9][A-Za-z0-9_]*(?:[\/:@~+=\-#.][A-Za-z0-9][
 const consumerIdentifierPattern = /^[A-Za-z0-9_-]+$/;
 
 function createMatcherCache(maxEntries = 100) {
-    const size = Number.isInteger(maxEntries) ? Math.max(0, maxEntries) : 100;
+    const maxSize = Number.isInteger(maxEntries) ? Math.max(0, maxEntries) : 100;
     const entries = new Map();
 
     return {
         get(raw) {
-            if (size === 0 || !entries.has(raw)) {
+            if (maxSize === 0 || !entries.has(raw)) {
                 return undefined;
             }
             const matcher = entries.get(raw);
@@ -20,14 +20,14 @@ function createMatcherCache(maxEntries = 100) {
             return matcher;
         },
         set(raw, matcher) {
-            if (size === 0) {
+            if (maxSize === 0) {
                 return matcher;
             }
             if (entries.has(raw)) {
                 entries.delete(raw);
             }
             entries.set(raw, matcher);
-            if (entries.size > size) {
+            if (entries.size > maxSize) {
                 const oldestKey = entries.keys().next().value;
                 entries.delete(oldestKey);
             }
