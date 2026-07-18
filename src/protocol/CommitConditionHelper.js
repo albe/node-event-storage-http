@@ -242,10 +242,11 @@ class CommitConditionHelper {
      * @returns {object}
      */
     static create(selector, noneMatchAfter, matcher = undefined) {
-        const helper = new CommitConditionHelper()
+        return new CommitConditionHelper()
+            .selector(selector)
             .matching(matcher)
-            .noneMatchAfter(noneMatchAfter);
-        return helper.selector(selector).build();
+            .noneMatchAfter(noneMatchAfter)
+            .build();
     }
 }
 

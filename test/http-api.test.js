@@ -449,6 +449,22 @@ test('GET /streams/join rejects _all to avoid redundant full-store joins', async
     }
 });
 
+test('GET /streams/join allows _all inside AND selector nodes', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        await commitAsync(fixture.eventStore, 'orders-2', [{ type: 'OrderPlaced', orderId: '2' }]);
+        const selector = encodeURIComponent(JSON.stringify([['_all', 'orders-1']]));
+
+        const response = await fetch(`${fixture.baseUrl}/streams/join?selector=${selector}`);
+        assert.equal(response.status, 200);
+        const events = await parseNdjson(response);
+        assert.deepEqual(events.map(event => event.stream), ['orders-1']);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('GET /streams/join over a single stream still applies global revision windows', async () => {
     const fixture = await createFixture();
     try {
