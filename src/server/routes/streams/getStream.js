@@ -6,9 +6,10 @@ import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
  * @param {number|undefined} [timeoutMs=10_000] Poll timeout in milliseconds.
+ * @param {{ get(raw: string): object|undefined, set(raw: string, matcher: object): object }|undefined} [matcherCache] Optional matcher cache.
  * @returns {void}
  */
-function registerGetStreamRoute(app, eventStore, timeoutMs = 10_000) {
+function registerGetStreamRoute(app, eventStore, timeoutMs = 10_000, matcherCache = undefined) {
     const runLongPoll = createLongPollRunner(eventStore, timeoutMs);
 
     /**
@@ -18,7 +19,7 @@ function registerGetStreamRoute(app, eventStore, timeoutMs = 10_000) {
      */
     const handleGetStream = async (request, response) => {
         const { resourceName: streamName, options } = splitReadStreamPath(request.params[0], true);
-        const filter = parseMatcher(request.query.filter, 'filter');
+        const filter = parseMatcher(request.query.filter, 'filter', matcherCache);
         const version = eventStore.getStreamVersion(streamName);
         if (version === -1) {
             throw new HttpError(404, `Stream "${streamName}" does not exist.`);

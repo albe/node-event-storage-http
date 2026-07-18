@@ -2,7 +2,7 @@
 
 HTTP API layer for [`event-storage`](https://www.npmjs.com/package/event-storage) — exposes an EventStore instance as a set of REST endpoints over NDJSON streaming.
 
-Requires `event-storage >= 1.3.0`.
+Requires `event-storage >= 1.4.0`.
 
 ## What and why
 
@@ -28,7 +28,8 @@ import EventStoreHttpApi from 'event-storage-http';
 
 const eventStore = new EventStore({
     storageDirectory: './data',
-    typeAccessor: 'type'
+    typeAccessor: 'type',
+    tagsAccessor: 'tags'
 });
 
 const api = new EventStoreHttpApi(eventStore);
@@ -45,7 +46,8 @@ import EventStoreHttpApi from 'event-storage-http';
 
 const eventStore = new EventStore({
     storageDirectory: './data',
-    typeAccessor: 'type'
+    typeAccessor: 'type',
+    tagsAccessor: 'tags'
 });
 
 const api = new EventStoreHttpApi(eventStore, {
@@ -59,7 +61,12 @@ const api = new EventStoreHttpApi(eventStore, {
 
     // How long (ms) stream/join/category reads wait for the next event when
     // long-polling is active before timing out. Defaults to 10 000.
-    streamPollTimeoutMs: 30_000
+    streamPollTimeoutMs: 30_000,
+
+    // Number of JSON matcher strings to keep in the HTTP matcher cache.
+    // Reuses stable matcher object references across repeated requests.
+    // Defaults to 100. Set to 0 to disable matcher caching.
+    matcherCacheSize: 100
 });
 
 api.listen(3000, () => console.log('Event store listening on port 3000'));
@@ -148,9 +155,9 @@ await fetch('http://127.0.0.1:3000/streams/orders-1/commit', {
 - `GET /streams`
 - `GET /streams/{stream}[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]`
 - `GET /streams/{stream}/version`
-- `GET /streams/join[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]?streams=...`
+- `GET /streams/join[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]?streams=...|selector=...`
 - `GET /streams/category/{category}[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]`
-- `GET /query[/from/{revision}]?types=...`
+- `GET /query[/from/{revision}]?types=...|selector=...|query=...`
 - `PUT /consumers/{identifier}/stream/{stream}[/from/{revision}]`
 - `GET /consumers/{identifier}`
 - `GET /consumers/{identifier}/after/{minVersion}`
@@ -174,7 +181,7 @@ Query responses also expose a serialized optimistic-concurrency condition in the
 - Body (JSON object):
   - `events` (required): non-empty array of event payload objects.
   - `expectedVersion` (optional): integer, `"any"`, or `"empty"`.
-  - `condition` (optional): serialized DCB commit condition (`{ types, noneMatchAfter, matcher? }`).
+  - `condition` (optional): serialized DCB commit condition (`{ selector|types, noneMatchAfter, matcher? }`).
   - `metadata` (optional): object merged into commit metadata for all events.
 
 ```json
@@ -229,11 +236,33 @@ or
 `GET /streams/join[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]?streams=...` returns one merged NDJSON stream over all listed streams.
 
 - Query params:
-  - `streams` (required): comma-separated stream names.
+  - `streams` (required when `selector` is omitted): comma-separated stream names.
+  - `selector` (required when `streams` is omitted): URL-encoded JSON selector algebra for nested joins.
   - `filter` (optional): matcher JSON object.
+
+Selector-algebra example:
+
+```http
+GET /streams/join?selector=%5B%5B%22tags%2Ffeatured%22%2C%5B%22OrderPlaced%22%2C%22OrderConfirmed%22%5D%5D%5D
+```
 
 
 `GET /streams/category/{category}[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]` returns NDJSON events for all streams in a category (`{category}-...` or `{category}/...`).
+
+
+### Query endpoints
+
+`GET /query[/from/{revision}]` returns NDJSON events for a selector plus optional matcher.
+
+- Query params (legacy):
+  - `types` (required unless `selector`/`query` is provided): comma-separated type/stream names.
+  - `filter` (optional): matcher JSON object.
+- Query params (selector algebra):
+  - `selector`: URL-encoded JSON selector algebra.
+  - `filter` (optional): matcher JSON object.
+- Query params (DCB shorthand):
+  - `query`: URL-encoded JSON DCB query object (`{ items: [{ types?, tags? }] }`).
+  - `filter` (optional): matcher JSON object.
 
 
 ### Consumer endpoints
@@ -263,10 +292,11 @@ On startup, `EventStoreHttpApi` calls `eventStore.scanConsumers()` once to pre-p
 
 Raw-mode matcher notes:
 
-- Object matchers are evaluated using the same core matcher semantics as `event-storage`, including nested equality, array OR values, and scalar operators (`$gt`, `$gte`, `$lt`, `$lte`, `$eq`, `$ne`).
+- Object matchers are evaluated using the same core matcher semantics as `event-storage`, including nested equality, array OR values, scalar operators (`$gt`, `$gte`, `$lt`, `$lte`, `$eq`, `$ne`), and array-containment operators (`$has`, `$hasAny`).
 - Object matchers are evaluated against compact JSON bytes (no parsing in the HTTP layer).
 - Function matchers in raw mode receive a raw document `Buffer`.
 - Raw object matchers require the default compact JSON serializer format.
+- String-encoded matchers are deserialized through a bounded LRU cache (`matcherCacheSize`, default `100`) so identical matcher JSON reuses the same in-memory object reference.
 
 ## Benchmark snapshot (local loopback)
 

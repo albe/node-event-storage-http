@@ -15,6 +15,7 @@ export interface EventStoreHttpApiOptions {
     autoStartConsumers?: boolean;
     consumerPollTimeoutMs?: number;
     streamPollTimeoutMs?: number;
+    matcherCacheSize?: number;
 }
 
 export class EventStoreHttpApi {

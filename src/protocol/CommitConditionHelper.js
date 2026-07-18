@@ -15,6 +15,27 @@ function validateTypes(types) {
     assert(types.every(type => typeof type === 'string' && type !== ''), 'types must be a non-empty array of strings.');
 }
 
+function validateSelector(selector) {
+    if (typeof selector === 'string') {
+        assert(selector !== '', 'selector stream names must not be empty.');
+        return;
+    }
+    assert(Array.isArray(selector) && selector.length > 0, 'selector must be a non-empty selector array or stream name.');
+    for (const item of selector) {
+        validateSelector(item);
+    }
+}
+
+function collectSelectorLeaves(selector) {
+    if (typeof selector === 'string') {
+        return [selector];
+    }
+    if (!Array.isArray(selector)) {
+        return [];
+    }
+    return selector.flatMap(item => collectSelectorLeaves(item));
+}
+
 function validateNoneMatchAfter(noneMatchAfter) {
     assert(Number.isInteger(noneMatchAfter) && noneMatchAfter >= 0, 'noneMatchAfter must be a non-negative integer.');
 }
@@ -28,7 +49,16 @@ function validateMatcher(matcher) {
 
 function validateCommitCondition(condition) {
     assert(condition && typeof condition === 'object' && !Array.isArray(condition), 'condition must be a JSON object.');
-    validateTypes(condition.types);
+    const selector = condition.selector ?? condition.types;
+    if (condition.selector !== undefined) {
+        validateSelector(condition.selector);
+    } else {
+        validateTypes(condition.types);
+    }
+    if (condition.types !== undefined) {
+        validateTypes(condition.types);
+    }
+    assert(selector !== undefined, 'condition must include selector or types.');
     validateNoneMatchAfter(condition.noneMatchAfter);
     validateMatcher(condition.matcher);
 }
@@ -124,7 +154,7 @@ class MatcherBuilder {
 class CommitConditionHelper {
     constructor() {
         this.data = {
-            types: [],
+            selector: undefined,
             noneMatchAfter: 0,
             matcher: undefined
         };
@@ -132,7 +162,13 @@ class CommitConditionHelper {
 
     types(types) {
         validateTypes(types);
-        this.data.types = [...types];
+        this.data.selector = [...types];
+        return this;
+    }
+
+    selector(selector) {
+        validateSelector(selector);
+        this.data.selector = cloneValue(selector);
         return this;
     }
 
@@ -153,8 +189,11 @@ class CommitConditionHelper {
     }
 
     build() {
+        const selector = cloneValue(this.data.selector);
+        const types = selector !== undefined ? collectSelectorLeaves(selector) : undefined;
         const condition = {
-            types: [...this.data.types],
+            ...(selector !== undefined ? { selector } : {}),
+            ...(types && types.length > 0 ? { types } : {}),
             noneMatchAfter: this.data.noneMatchAfter,
             ...(this.data.matcher !== undefined ? { matcher: cloneValue(this.data.matcher) } : {})
         };
@@ -197,15 +236,16 @@ class CommitConditionHelper {
         };
     }
 
-    static create(types, noneMatchAfter, matcher = undefined) {
-        return new CommitConditionHelper()
-            .types(types)
+    static create(selectorOrTypes, noneMatchAfter, matcher = undefined) {
+        const helper = new CommitConditionHelper()
             .matching(matcher)
-            .noneMatchAfter(noneMatchAfter)
-            .build();
+            .noneMatchAfter(noneMatchAfter);
+        if (Array.isArray(selectorOrTypes) && selectorOrTypes.every(item => typeof item === 'string' && item !== '')) {
+            return helper.types(selectorOrTypes).build();
+        }
+        return helper.selector(selectorOrTypes).build();
     }
 }
 
 export { CommitConditionHelper, MatcherBuilder, CONDITION_HEADER };
-
 

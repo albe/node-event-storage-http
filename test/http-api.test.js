@@ -18,15 +18,16 @@ function commitAsync(eventStore, streamName, events) {
     });
 }
 
-async function createFixture() {
+async function createFixture({ eventStoreConfig = {}, apiOptions = {} } = {}) {
     const storageDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'event-storage-http-test-'));
     const eventStore = new EventStore({
         storageDirectory,
-        typeAccessor: 'type'
+        typeAccessor: 'type',
+        ...eventStoreConfig
     });
     await once(eventStore, 'ready');
 
-    const api = new EventStoreHttpApi(eventStore);
+    const api = new EventStoreHttpApi(eventStore, apiOptions);
     const server = api.createServer();
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
@@ -228,7 +229,7 @@ test('HTTP API validates stream names and consumer identifiers', async () => {
         });
         assert.equal(invalidStreamResponse.status, 400);
         assert.deepEqual(await invalidStreamResponse.json(), {
-            error: 'stream must use segments that start with a letter or number and may contain letters, numbers, "-", "_", ".", and "/".'
+            error: 'stream must use segments that start with a letter or number and may contain letters, numbers, "_", and separators "/", ":", "@", "~", "+", "=", "-", "#", ".".'
         });
 
         const invalidJoinResponse = await fetch(`${fixture.baseUrl}/streams/join?streams=orders..1`);
@@ -466,6 +467,43 @@ test('GET /streams/join over a single stream still applies global revision windo
     }
 });
 
+test('GET /streams/join supports nested selector algebra via selector query parameter', async () => {
+    const fixture = await createFixture({ eventStoreConfig: { tagsAccessor: 'tags' } });
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [
+            { type: 'OrderPlaced', orderId: '1', tags: ['featured', 'eu'] }
+        ]);
+        await commitAsync(fixture.eventStore, 'orders-2', [
+            { type: 'OrderPlaced', orderId: '2', tags: ['featured'] }
+        ]);
+        await commitAsync(fixture.eventStore, 'orders-3', [
+            { type: 'OrderCancelled', orderId: '3', tags: ['eu'] }
+        ]);
+
+        const selector = encodeURIComponent(JSON.stringify([['tags/featured', ['tags/eu', 'OrderPlaced']]]));
+        const response = await fetch(`${fixture.baseUrl}/streams/join?selector=${selector}`);
+        assert.equal(response.status, 200);
+
+        const events = await parseNdjson(response);
+        assert.deepEqual(events.map(event => event.payload.orderId), ['1']);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /streams/join accepts non-existing streams as empty results', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        const response = await fetch(`${fixture.baseUrl}/streams/join?streams=orders-1,orders-missing`);
+        assert.equal(response.status, 200);
+        const events = await parseNdjson(response);
+        assert.deepEqual(events.map(event => event.stream), ['orders-1']);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('GET /streams/join long-poll returns 408 when no in-range event becomes visible', async () => {
     const fixture = await createFixture();
     try {
@@ -527,6 +565,7 @@ test('GET /query returns NDJSON and exposes a serialized commit condition header
         assert.equal(response.status, 200);
         const condition = JSON.parse(response.headers.get('x-event-store-query-condition'));
         assert.deepEqual(condition, {
+            selector: ['OrderPlaced'],
             types: ['OrderPlaced'],
             noneMatchAfter: 2,
             matcher: { payload: { orderId: '2' } }
@@ -555,6 +594,89 @@ test('GET /query supports operator object matchers from core event-storage', asy
         const events = await parseNdjson(response);
         assert.equal(events.length, 1);
         assert.equal(events[0].payload.amount, 150);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /query supports DCB shorthand query payloads with tags and types', async () => {
+    const fixture = await createFixture({ eventStoreConfig: { tagsAccessor: 'tags' } });
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [
+            { type: 'OrderPlaced', orderId: '1', tags: ['featured'] },
+            { type: 'OrderPlaced', orderId: '2', tags: ['archived'] }
+        ]);
+
+        const dcbQuery = encodeURIComponent(JSON.stringify({
+            items: [{ types: ['OrderPlaced'], tags: ['featured'] }]
+        }));
+        const response = await fetch(`${fixture.baseUrl}/query?query=${dcbQuery}`);
+        assert.equal(response.status, 200);
+
+        const condition = JSON.parse(response.headers.get('x-event-store-query-condition'));
+        assert.deepEqual(condition.selector, [['tags/featured', 'OrderPlaced']]);
+        const events = await parseNdjson(response);
+        assert.deepEqual(events.map(event => event.payload.orderId), ['1']);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /query treats non-existing type streams as empty', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [
+            { type: 'OrderPlaced', orderId: '1' }
+        ]);
+
+        const response = await fetch(`${fixture.baseUrl}/query?types=MissingType`);
+        assert.equal(response.status, 200);
+        const events = await parseNdjson(response);
+        assert.deepEqual(events, []);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('GET /query supports $hasAny array matchers', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [
+            { type: 'OrderPlaced', orderId: '1', tags: ['featured'] },
+            { type: 'OrderPlaced', orderId: '2', tags: ['archived'] }
+        ]);
+        const filter = encodeURIComponent(JSON.stringify({ payload: { tags: { $hasAny: ['featured', 'beta'] } } }));
+        const response = await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter}`);
+        assert.equal(response.status, 200);
+        const events = await parseNdjson(response);
+        assert.deepEqual(events.map(event => event.payload.orderId), ['1']);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('HTTP matcher parsing reuses object references for repeated JSON matcher strings', async () => {
+    const fixture = await createFixture({ apiOptions: { matcherCacheSize: 100 } });
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const seenMatchers = [];
+        const originalQuery = fixture.eventStore.query.bind(fixture.eventStore);
+        fixture.eventStore.query = (selector, matcher, minRevision, raw) => {
+            seenMatchers.push(matcher);
+            return originalQuery(selector, matcher, minRevision, raw);
+        };
+
+        const filter = encodeURIComponent(JSON.stringify({ payload: { orderId: '1' } }));
+        const firstResponse = await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter}`);
+        const secondResponse = await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter}`);
+        assert.equal(firstResponse.status, 200);
+        assert.equal(secondResponse.status, 200);
+        await parseNdjson(firstResponse);
+        await parseNdjson(secondResponse);
+
+        assert.equal(seenMatchers.length, 2);
+        assert.strictEqual(seenMatchers[0], seenMatchers[1]);
     } finally {
         await destroyFixture(fixture);
     }
@@ -770,4 +892,3 @@ test('GET /consumers/:identifier returns running consumer from registry without 
         await destroyFixture(fixture);
     }
 });
-

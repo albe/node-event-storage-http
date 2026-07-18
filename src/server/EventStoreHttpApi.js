@@ -2,7 +2,7 @@ import http from 'http';
 import express from 'express';
 import { once } from 'events';
 import { HttpError, sendError } from './http/errors.js';
-import { waitForReadyMiddleware } from './http/routeUtils.js';
+import { createMatcherCache, waitForReadyMiddleware } from './http/routeUtils.js';
 import registerGetConsumerRoute from './routes/consumers/getConsumer.js';
 import registerGetConsumersRoute from './routes/consumers/getConsumers.js';
 import registerGetConsumerAfterRoute from './routes/consumers/getConsumerAfter.js';
@@ -21,7 +21,8 @@ import registerPutStreamRoute from './routes/streams/putStream.js';
  * @typedef {{
  *   autoStartConsumers?: boolean|undefined,
  *   consumerPollTimeoutMs?: number|undefined,
- *   streamPollTimeoutMs?: number|undefined
+ *   streamPollTimeoutMs?: number|undefined,
+ *   matcherCacheSize?: number|undefined
  * }} EventStoreHttpApiOptions
  */
 
@@ -57,6 +58,7 @@ class EventStoreHttpApi {
         const storage = eventStore.storage;
         this.eventStore = eventStore;
         this.options = options;
+        this.matcherCache = createMatcherCache(options.matcherCacheSize ?? 100);
         this.server = null;
         this.ready = storage?.initialized === true
             ? Promise.resolve()
@@ -129,14 +131,14 @@ class EventStoreHttpApi {
         registerGetConsumerRoute(app, this.eventStore);
         registerGetConsumerAfterRoute(app, this.eventStore, this.options.consumerPollTimeoutMs ?? 10_000);
         registerPutConsumerRoute(app, this.eventStore);
-        registerGetQueryRoute(app, this.eventStore);
-        registerGetJoinRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000);
-        registerGetCategoryRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000);
+        registerGetQueryRoute(app, this.eventStore, this.matcherCache);
+        registerGetJoinRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000, this.matcherCache);
+        registerGetCategoryRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000, this.matcherCache);
         registerGetStreamsRoute(app, this.eventStore);
-        registerPostCommitRoute(app, this.eventStore);
+        registerPostCommitRoute(app, this.eventStore, this.matcherCache);
         registerGetVersionRoute(app, this.eventStore);
-        registerGetStreamRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000);
-        registerPutStreamRoute(app, this.eventStore);
+        registerGetStreamRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000, this.matcherCache);
+        registerPutStreamRoute(app, this.eventStore, this.matcherCache);
 
         /**
          * @param {import('express').Request} request Express request.
