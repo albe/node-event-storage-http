@@ -682,6 +682,41 @@ test('HTTP matcher parsing reuses object references for repeated JSON matcher st
     }
 });
 
+test('HTTP matcher cache evicts least-recently-used entries when full', async () => {
+    const fixture = await createFixture({ apiOptions: { matcherCacheSize: 2 } });
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const seenMatchers = [];
+        const originalQuery = fixture.eventStore.query.bind(fixture.eventStore);
+        fixture.eventStore.query = (selector, matcher, minRevision, raw) => {
+            seenMatchers.push(matcher);
+            return originalQuery(selector, matcher, minRevision, raw);
+        };
+
+        const filter1 = encodeURIComponent(JSON.stringify({ payload: { orderId: '1' } }));
+        const filter2 = encodeURIComponent(JSON.stringify({ payload: { orderId: '2' } }));
+        const filter3 = encodeURIComponent(JSON.stringify({ payload: { orderId: '3' } }));
+
+        const responses = [
+            await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter1}`),
+            await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter2}`),
+            await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter3}`),
+            await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter1}`)
+        ];
+
+        for (const response of responses) {
+            assert.equal(response.status, 200);
+            await parseNdjson(response);
+        }
+
+        assert.equal(seenMatchers.length, 4);
+        assert.notStrictEqual(seenMatchers[0], seenMatchers[3], 'oldest matcher should be evicted when cache exceeds configured size');
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('PUT /consumers/:identifier/stream/:stream and GET /consumers endpoints expose durable consumers', async () => {
     const fixture = await createFixture();
     try {

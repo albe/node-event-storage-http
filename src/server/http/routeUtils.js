@@ -2,7 +2,7 @@ import { CommitCondition, ExpectedVersion } from 'event-storage';
 import { HttpError } from './errors.js';
 
 const readOptionNames = new Set(['from', 'until', 'forwards', 'backwards']);
-const streamNamePattern = /^[A-Za-z0-9][A-Za-z0-9_]*(?:[\/:@~+=\-#.][A-Za-z0-9_]+)*$/;
+const streamNamePattern = /^[A-Za-z0-9][A-Za-z0-9_]*(?:[\/:@~+=\-#.][A-Za-z0-9][A-Za-z0-9_]*)*$/;
 const consumerIdentifierPattern = /^[A-Za-z0-9_-]+$/;
 
 function createMatcherCache(maxEntries = 100) {
@@ -28,7 +28,7 @@ function createMatcherCache(maxEntries = 100) {
             }
             entries.set(raw, matcher);
             if (entries.size > size) {
-                const [oldestKey] = entries.keys();
+                const oldestKey = entries.keys().next().value;
                 entries.delete(oldestKey);
             }
             return matcher;
