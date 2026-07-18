@@ -31,7 +31,7 @@ function isStoreOpen(eventStore) {
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
  * @returns {void}
  */
-function registerGetHealthRoute(app, eventStore) {
+function registerGetHealthRoute(app, { eventStore } = {}) {
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
@@ -83,5 +83,4 @@ function registerGetHealthRoute(app, eventStore) {
 }
 
 export default registerGetHealthRoute;
-
 

@@ -124,21 +124,26 @@ class EventStoreHttpApi {
      */
     _registerRoutes(app, { includeNotFound = false } = {}) {
         app.use(express.json({ limit: '1mb' }));
-        registerGetHealthRoute(app, this.eventStore);
+        const routeParams = {
+            eventStore: this.eventStore,
+            options: this.options,
+            matcherCache: this.matcherCache
+        };
+        registerGetHealthRoute(app, routeParams);
         app.use((request, response, next) => waitForReadyMiddleware(this.ready, request, response, next));
 
-        registerGetConsumersRoute(app, this.eventStore);
-        registerGetConsumerRoute(app, this.eventStore);
-        registerGetConsumerAfterRoute(app, this.eventStore, this.options.consumerPollTimeoutMs ?? 10_000);
-        registerPutConsumerRoute(app, this.eventStore);
-        registerGetQueryRoute(app, this.eventStore, this.matcherCache);
-        registerGetJoinRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000, this.matcherCache);
-        registerGetCategoryRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000, this.matcherCache);
-        registerGetStreamsRoute(app, this.eventStore);
-        registerPostCommitRoute(app, this.eventStore, this.matcherCache);
-        registerGetVersionRoute(app, this.eventStore);
-        registerGetStreamRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000, this.matcherCache);
-        registerPutStreamRoute(app, this.eventStore, this.matcherCache);
+        registerGetConsumersRoute(app, routeParams);
+        registerGetConsumerRoute(app, routeParams);
+        registerGetConsumerAfterRoute(app, routeParams);
+        registerPutConsumerRoute(app, routeParams);
+        registerGetQueryRoute(app, routeParams);
+        registerGetJoinRoute(app, routeParams);
+        registerGetCategoryRoute(app, routeParams);
+        registerGetStreamsRoute(app, routeParams);
+        registerPostCommitRoute(app, routeParams);
+        registerGetVersionRoute(app, routeParams);
+        registerGetStreamRoute(app, routeParams);
+        registerPutStreamRoute(app, routeParams);
 
         /**
          * @param {import('express').Request} request Express request.

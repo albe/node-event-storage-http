@@ -1,6 +1,6 @@
 import { HttpError } from '../../http/errors.js';
 import { writeNdjson } from '../../http/ndjson.js';
-import { collectSelectorLeaves, getQueryValues, parseJson, parseMatcher, parseRevision, parseSelector, parseStreamName, resolveBoundary, serializeCondition } from '../../http/routeUtils.js';
+import { getQueryValues, parseJson, parseMatcher, parseRevision, parseSelector, parseStreamName, resolveBoundary, serializeCondition } from '../../http/routeUtils.js';
 
 /**
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
@@ -8,7 +8,7 @@ import { collectSelectorLeaves, getQueryValues, parseJson, parseMatcher, parseRe
  * @param {{ get(raw: string): object|undefined, set(raw: string, matcher: object): object }|undefined} [matcherCache] Optional matcher cache.
  * @returns {void}
  */
-function registerGetQueryRoute(app, eventStore, matcherCache = undefined) {
+function registerGetQueryRoute(app, { eventStore, matcherCache } = {}) {
     /**
      * @param {import('express').Request} request
      * @returns {object|null}
@@ -88,10 +88,8 @@ function registerGetQueryRoute(app, eventStore, matcherCache = undefined) {
             : undefined;
         const minRevision = resolveBoundary(parsedRevision, 1, eventStore.length);
         const { stream, condition } = eventStore.query(selectorInput, filter, minRevision, true);
-        const selectorLeaves = collectSelectorLeaves(condition.selector ?? selectorInput);
         await writeNdjson(response, stream, {
-            'x-event-store-query-condition': serializeCondition(condition, filter),
-            'x-event-store-query-types': selectorLeaves.join(',')
+            'x-event-store-query-condition': serializeCondition(condition, filter)
         });
     };
 

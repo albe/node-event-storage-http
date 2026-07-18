@@ -172,10 +172,8 @@ function parseCondition(value, matcherCache = undefined) {
  */
 function serializeCondition(condition, matcher = null) {
     const selector = condition.selector ?? condition.types;
-    const types = selector === undefined ? [] : collectSelectorLeaves(selector);
     return JSON.stringify({
         ...(selector !== undefined ? { selector } : {}),
-        ...(types.length > 0 ? { types } : {}),
         noneMatchAfter: condition.noneMatchAfter,
         ...(matcher ? { matcher } : {})
     });

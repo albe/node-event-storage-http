@@ -5,7 +5,7 @@ import { sendJson } from '../../http/errors.js';
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
  * @returns {void}
  */
-function registerGetStreamsRoute(app, eventStore) {
+function registerGetStreamsRoute(app, { eventStore } = {}) {
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
@@ -28,4 +28,3 @@ function registerGetStreamsRoute(app, eventStore) {
 }
 
 export default registerGetStreamsRoute;
-

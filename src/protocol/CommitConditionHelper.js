@@ -49,16 +49,15 @@ function validateMatcher(matcher) {
 
 function validateCommitCondition(condition) {
     assert(condition && typeof condition === 'object' && !Array.isArray(condition), 'condition must be a JSON object.');
-    const selector = condition.selector ?? condition.types;
-    if (condition.selector !== undefined) {
+    const hasSelector = condition.selector !== undefined;
+    const hasTypes = condition.types !== undefined;
+    assert(hasSelector || hasTypes, 'condition must include selector or types.');
+    assert(!(hasSelector && hasTypes), 'condition must include either selector or types, not both.');
+    if (hasSelector) {
         validateSelector(condition.selector);
     } else {
         validateTypes(condition.types);
     }
-    if (condition.types !== undefined) {
-        validateTypes(condition.types);
-    }
-    assert(selector !== undefined, 'condition must include selector or types.');
     validateNoneMatchAfter(condition.noneMatchAfter);
     validateMatcher(condition.matcher);
 }
@@ -190,10 +189,8 @@ class CommitConditionHelper {
 
     build() {
         const selector = cloneValue(this.data.selector);
-        const types = selector !== undefined ? collectSelectorLeaves(selector) : undefined;
         const condition = {
             ...(selector !== undefined ? { selector } : {}),
-            ...(types && types.length > 0 ? { types } : {}),
             noneMatchAfter: this.data.noneMatchAfter,
             ...(this.data.matcher !== undefined ? { matcher: cloneValue(this.data.matcher) } : {})
         };
@@ -237,11 +234,11 @@ class CommitConditionHelper {
     }
 
     /**
-     * Build a serialized commit condition from either legacy `types` or selector algebra.
-     * Flat non-empty string arrays are treated as legacy `types` for backwards compatibility.
-     * Any nested selector structure (string leaf, nested arrays) is treated as `selector`.
+     * @typedef {string|Selector[]} Selector
      *
-     * @param {string[]|string|string[]|Array<unknown>} selectorOrTypes
+     * Build a serialized commit condition from either legacy `types` or selector algebra.
+     *
+     * @param {Selector} selectorOrTypes
      * @param {number} noneMatchAfter
      * @param {object|undefined} [matcher=undefined]
      * @returns {object}
@@ -250,11 +247,6 @@ class CommitConditionHelper {
         const helper = new CommitConditionHelper()
             .matching(matcher)
             .noneMatchAfter(noneMatchAfter);
-        // Backwards compatibility: plain string arrays map to legacy `types`,
-        // while nested arrays/strings are treated as selector algebra.
-        if (Array.isArray(selectorOrTypes) && selectorOrTypes.every(item => typeof item === 'string' && item !== '')) {
-            return helper.types(selectorOrTypes).build();
-        }
         return helper.selector(selectorOrTypes).build();
     }
 }

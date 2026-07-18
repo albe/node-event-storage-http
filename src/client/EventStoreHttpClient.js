@@ -109,12 +109,7 @@ class EventStoreHttpClient {
      * @returns {Promise<HttpEventStream>} NDJSON event stream.
      */
     async readJoin(selectorOrStreams, { from = 1, until, signal } = {}) {
-        const source = { kind: 'join' };
-        if (Array.isArray(selectorOrStreams) && selectorOrStreams.every(value => typeof value === 'string')) {
-            source.streams = selectorOrStreams;
-        } else {
-            source.selector = selectorOrStreams;
-        }
+        const source = { kind: 'join', selector: selectorOrStreams };
         const res = await this._request('GET', this._readPath(source, from, until), { signal });
         return new HttpEventStream(res);
     }

@@ -84,6 +84,4 @@ test('CommitConditionHelper selector(...) supports nested selector algebra', () 
         .build();
 
     assert.deepEqual(condition.selector, [['tags/featured', ['OrderPlaced', 'OrderConfirmed']]]);
-    assert.deepEqual(condition.types, ['tags/featured', 'OrderPlaced', 'OrderConfirmed']);
 });
-

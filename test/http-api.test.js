@@ -566,7 +566,6 @@ test('GET /query returns NDJSON and exposes a serialized commit condition header
         const condition = JSON.parse(response.headers.get('x-event-store-query-condition'));
         assert.deepEqual(condition, {
             selector: ['OrderPlaced'],
-            types: ['OrderPlaced'],
             noneMatchAfter: 2,
             matcher: { payload: { orderId: '2' } }
         });
@@ -864,7 +863,7 @@ test('HttpEventStream parses NDJSON response body and exposes commitCondition he
 
         const stream = new HttpEventStream(response);
         assert.ok(stream.commitCondition, 'commitCondition should be populated from response header');
-        assert.deepEqual(stream.commitCondition.types, ['OrderPlaced', 'OrderConfirmed']);
+        assert.deepEqual(stream.commitCondition.selector, ['OrderPlaced', 'OrderConfirmed']);
 
         const events = await stream.toArray();
         assert.equal(events.length, 2);

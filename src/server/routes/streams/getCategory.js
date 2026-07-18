@@ -9,7 +9,8 @@ import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
  * @param {{ get(raw: string): object|undefined, set(raw: string, matcher: object): object }|undefined} [matcherCache] Optional matcher cache.
  * @returns {void}
  */
-function registerGetCategoryRoute(app, eventStore, timeoutMs = 10_000, matcherCache = undefined) {
+function registerGetCategoryRoute(app, { eventStore, options = {}, matcherCache } = {}) {
+    const timeoutMs = options.streamPollTimeoutMs ?? 10_000;
     const runLongPoll = createLongPollRunner(eventStore, timeoutMs);
 
     /**

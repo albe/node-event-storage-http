@@ -7,7 +7,7 @@ import { parseMatcher, parseStreamName } from '../../http/routeUtils.js';
  * @param {{ get(raw: string): object|undefined, set(raw: string, matcher: object): object }|undefined} [matcherCache] Optional matcher cache.
  * @returns {void}
  */
-function registerPutStreamRoute(app, eventStore, matcherCache = undefined) {
+function registerPutStreamRoute(app, { eventStore, matcherCache } = {}) {
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.

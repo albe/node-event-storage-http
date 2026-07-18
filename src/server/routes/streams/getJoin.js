@@ -9,7 +9,8 @@ import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
  * @param {{ get(raw: string): object|undefined, set(raw: string, matcher: object): object }|undefined} [matcherCache] Optional matcher cache.
  * @returns {void}
  */
-function registerGetJoinRoute(app, eventStore, timeoutMs = 10_000, matcherCache = undefined) {
+function registerGetJoinRoute(app, { eventStore, options = {}, matcherCache } = {}) {
+    const timeoutMs = options.streamPollTimeoutMs ?? 10_000;
     const runLongPoll = createLongPollRunner(eventStore, timeoutMs);
 
     /**
@@ -46,16 +47,15 @@ function registerGetJoinRoute(app, eventStore, timeoutMs = 10_000, matcherCache 
             throw new HttpError(400, 'streams must not include "_all" for join reads. Use GET /streams/_all instead.');
         }
 
-        const options = parseReadOptions(rawOptions);
-        const { from, until } = buildReadWindow(eventStore.length, options);
+        const readOptions = parseReadOptions(rawOptions);
+        const { from, until } = buildReadWindow(eventStore.length, readOptions);
         const version = eventStore.length;
-        const joinName = `join:${selectorLeaves.join(',') || 'selector'}`;
+        const joinName = `join:${Date.now()}`;
         const indexNames = new Set(selectorLeaves.map(name => `stream-${name}`));
 
         await runLongPoll(response, {
             range: { from, until, version },
             headers: {
-                'x-event-store-streams': selectorLeaves.join(','),
                 'x-event-store-selector': JSON.stringify(streamSelector)
             },
             source: {

@@ -41,7 +41,7 @@ function compileHandler(handlerCode) {
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
  * @returns {void}
  */
-function registerPutConsumerRoute(app, eventStore) {
+function registerPutConsumerRoute(app, { eventStore } = {}) {
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.

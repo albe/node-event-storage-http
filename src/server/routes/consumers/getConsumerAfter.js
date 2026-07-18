@@ -15,7 +15,8 @@ import { parseConsumerIdentifier, parsePositiveInteger } from '../../http/routeU
  * @param {number|undefined} [timeoutMs=10_000] Poll timeout in milliseconds.
  * @returns {void}
  */
-function registerGetConsumerAfterRoute(app, eventStore, timeoutMs = 10_000) {
+function registerGetConsumerAfterRoute(app, { eventStore, options = {} } = {}) {
+    const timeoutMs = options.consumerPollTimeoutMs ?? 10_000;
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
