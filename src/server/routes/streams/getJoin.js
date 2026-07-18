@@ -3,6 +3,16 @@ import { HttpError } from '../../http/errors.js';
 import { buildReadWindow, collectSelectorLeaves, getQueryValues, parseJson, parseMatcher, parseReadOptions, parseSelector, parseStreamName } from '../../http/routeUtils.js';
 import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
 
+/**
+ * Normalize selector nodes enough to determine whether the selector collapses
+ * to `_all` under the event-storage alternating OR/AND depth semantics.
+ *
+ * Depth 0 (root) is OR, depth 1 is AND, then it alternates.
+ *
+ * @param {string|Array<string|Array>} selector
+ * @param {number} [depth=0]
+ * @returns {string|Array<string|Array>}
+ */
 function normalizeSelectorForAll(selector, depth = 0) {
     if (typeof selector === 'string') {
         return selector;
