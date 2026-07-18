@@ -104,7 +104,7 @@ test('client.readJoin supports nested selector algebra', async () => {
         await client.commit('orders-1', [{ type: 'OrderPlaced', orderId: '1', tags: ['featured', 'eu'] }]);
         await client.commit('orders-2', [{ type: 'OrderPlaced', orderId: '2', tags: ['featured'] }]);
 
-        const stream = await client.readJoin([['tags/featured', ['tags/eu', 'OrderPlaced']]]);
+        const stream = await client.readJoin([['tags/featured', 'tags/eu', ['OrderPlaced']]]);
         const events = await stream.toArray();
         assert.deepEqual(events.map(event => event.payload.orderId), ['1']);
     } finally {

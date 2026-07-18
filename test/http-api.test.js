@@ -480,7 +480,7 @@ test('GET /streams/join supports nested selector algebra via selector query para
             { type: 'OrderCancelled', orderId: '3', tags: ['eu'] }
         ]);
 
-        const selector = encodeURIComponent(JSON.stringify([['tags/featured', ['tags/eu', 'OrderPlaced']]]));
+        const selector = encodeURIComponent(JSON.stringify([['tags/featured', 'tags/eu', ['OrderPlaced']]]));
         const response = await fetch(`${fixture.baseUrl}/streams/join?selector=${selector}`);
         assert.equal(response.status, 200);
 
