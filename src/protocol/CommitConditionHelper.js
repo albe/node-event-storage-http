@@ -234,18 +234,18 @@ class CommitConditionHelper {
     }
 
     /**
-     * Build a serialized commit condition from either legacy `types` or selector algebra.
+     * Build a serialized commit condition from selector algebra.
      *
-     * @param {string|Array<unknown>} selectorOrTypes
+     * @param {string|Array<unknown>} selector
      * @param {number} noneMatchAfter
      * @param {object|undefined} [matcher=undefined]
      * @returns {object}
      */
-    static create(selectorOrTypes, noneMatchAfter, matcher = undefined) {
+    static create(selector, noneMatchAfter, matcher = undefined) {
         const helper = new CommitConditionHelper()
             .matching(matcher)
             .noneMatchAfter(noneMatchAfter);
-        return helper.selector(selectorOrTypes).build();
+        return helper.selector(selector).build();
     }
 }
 

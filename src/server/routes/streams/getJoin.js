@@ -1,8 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { HttpError } from '../../http/errors.js';
 import { buildReadWindow, collectSelectorLeaves, getQueryValues, parseJson, parseMatcher, parseReadOptions, parseSelector, parseStreamName } from '../../http/routeUtils.js';
 import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
-
-let joinSequence = 0;
 
 /**
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
@@ -52,7 +51,7 @@ function registerGetJoinRoute(app, { eventStore, options = {}, matcherCache } = 
         const parsedReadOptions = parseReadOptions(rawOptions);
         const { from, until } = buildReadWindow(eventStore.length, parsedReadOptions);
         const version = eventStore.length;
-        const joinName = `join:${Date.now()}:${joinSequence++}`;
+        const joinName = `join:${Date.now()}:${randomUUID()}`;
         const indexNames = new Set(selectorLeaves.map(name => `stream-${name}`));
 
         await runLongPoll(response, {
