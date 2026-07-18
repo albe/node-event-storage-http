@@ -2,6 +2,8 @@ import { HttpError } from '../../http/errors.js';
 import { buildReadWindow, collectSelectorLeaves, getQueryValues, parseJson, parseMatcher, parseReadOptions, parseSelector, parseStreamName } from '../../http/routeUtils.js';
 import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
 
+let joinSequence = 0;
+
 /**
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
@@ -47,10 +49,10 @@ function registerGetJoinRoute(app, { eventStore, options = {}, matcherCache } = 
             throw new HttpError(400, 'streams must not include "_all" for join reads. Use GET /streams/_all instead.');
         }
 
-        const readOptions = parseReadOptions(rawOptions);
-        const { from, until } = buildReadWindow(eventStore.length, readOptions);
+        const parsedReadOptions = parseReadOptions(rawOptions);
+        const { from, until } = buildReadWindow(eventStore.length, parsedReadOptions);
         const version = eventStore.length;
-        const joinName = `join:${Date.now()}`;
+        const joinName = `join:${Date.now()}:${joinSequence++}`;
         const indexNames = new Set(selectorLeaves.map(name => `stream-${name}`));
 
         await runLongPoll(response, {

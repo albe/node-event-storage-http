@@ -234,11 +234,9 @@ class CommitConditionHelper {
     }
 
     /**
-     * @typedef {string|Selector[]} Selector
-     *
      * Build a serialized commit condition from either legacy `types` or selector algebra.
      *
-     * @param {Selector} selectorOrTypes
+     * @param {string|Array<unknown>} selectorOrTypes
      * @param {number} noneMatchAfter
      * @param {object|undefined} [matcher=undefined]
      * @returns {object}
