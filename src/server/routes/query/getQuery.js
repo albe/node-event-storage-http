@@ -58,22 +58,30 @@ function registerGetQueryRoute(app, eventStore, matcherCache = undefined) {
     };
 
     /**
+     * @param {import('express').Request} request
+     * @returns {object|string|undefined}
+     */
+    const extractBodyMatcher = (request) => {
+        if (request.body?.matcher !== undefined) {
+            return request.body.matcher;
+        }
+        if (!request.body || typeof request.body !== 'object' || Array.isArray(request.body)) {
+            return undefined;
+        }
+        if (Array.isArray(request.body.items) || Array.isArray(request.body.query?.items)) {
+            return undefined;
+        }
+        return request.body;
+    };
+
+    /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
      * @returns {Promise<void>}
      */
     const handleGetQuery = async (request, response) => {
         const selectorInput = parseSelectorInput(request);
-        const bodyMatcher = request.body?.matcher
-            ?? (
-                request.body &&
-                typeof request.body === 'object' &&
-                !Array.isArray(request.body) &&
-                !Array.isArray(request.body.items) &&
-                !Array.isArray(request.body.query?.items)
-                    ? request.body
-                    : undefined
-            );
+        const bodyMatcher = extractBodyMatcher(request);
         const filter = parseMatcher(bodyMatcher ?? request.query.filter, 'filter', matcherCache);
         const parsedRevision = request.params.revision
             ? parseRevision(request.params.revision, 'from')

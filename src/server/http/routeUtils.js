@@ -2,6 +2,7 @@ import { CommitCondition, ExpectedVersion } from 'event-storage';
 import { HttpError } from './errors.js';
 
 const readOptionNames = new Set(['from', 'until', 'forwards', 'backwards']);
+const streamNameSeparators = ['/', ':', '@', '~', '+', '=', '-', '#', '.'];
 const streamNamePattern = /^[A-Za-z0-9][A-Za-z0-9_]*(?:[\/:@~+=\-#.][A-Za-z0-9][A-Za-z0-9_]*)*$/;
 const consumerIdentifierPattern = /^[A-Za-z0-9_-]+$/;
 
@@ -25,12 +26,11 @@ function createMatcherCache(maxEntries = 100) {
             }
             if (entries.has(raw)) {
                 entries.delete(raw);
-            }
-            entries.set(raw, matcher);
-            if (entries.size > maxSize) {
+            } else if (entries.size >= maxSize) {
                 const oldestKey = entries.keys().next().value;
                 entries.delete(oldestKey);
             }
+            entries.set(raw, matcher);
             return matcher;
         },
         get size() {
@@ -233,7 +233,7 @@ function parseStreamName(value, source = 'stream', allowAll = false) {
         return value;
     }
     if (!streamNamePattern.test(value)) {
-        throw new HttpError(400, `${source} must use segments that start with a letter or number and may contain letters, numbers, "_", and separators "/", ":", "@", "~", "+", "=", "-", "#", ".".`);
+        throw new HttpError(400, `${source} must use segments that start with a letter or number and may contain letters, numbers, "_", and separators ${streamNameSeparators.map(separator => `"${separator}"`).join(', ')}.`);
     }
     return value;
 }

@@ -702,6 +702,7 @@ test('HTTP matcher cache evicts least-recently-used entries when full', async ()
             await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter1}`),
             await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter2}`),
             await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter3}`),
+            await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter2}`),
             await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter1}`)
         ];
 
@@ -710,8 +711,9 @@ test('HTTP matcher cache evicts least-recently-used entries when full', async ()
             await parseNdjson(response);
         }
 
-        assert.equal(seenMatchers.length, 4);
-        assert.notStrictEqual(seenMatchers[0], seenMatchers[3], 'oldest matcher should be evicted when cache exceeds configured size');
+        assert.equal(seenMatchers.length, 5);
+        assert.strictEqual(seenMatchers[1], seenMatchers[3], 'non-evicted matcher should keep stable reference');
+        assert.notStrictEqual(seenMatchers[0], seenMatchers[4], 'oldest matcher should be evicted when cache exceeds configured size');
     } finally {
         await destroyFixture(fixture);
     }
