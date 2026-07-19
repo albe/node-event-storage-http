@@ -434,16 +434,16 @@ test('GET /streams/join and /streams/category return joined NDJSON output, inclu
     }
 });
 
-test('GET /streams/join rejects _all to avoid redundant full-store joins', async () => {
+test('GET /streams/join accepts _all selectors', async () => {
     const fixture = await createFixture();
     try {
         await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        await commitAsync(fixture.eventStore, 'orders-2', [{ type: 'OrderPlaced', orderId: '2' }]);
 
         const response = await fetch(`${fixture.baseUrl}/streams/join?streams=_all,orders-1`);
-        assert.equal(response.status, 400);
-        assert.deepEqual(await response.json(), {
-            error: 'streams must not include "_all" for join reads. Use GET /streams/_all instead.'
-        });
+        assert.equal(response.status, 200);
+        const events = await parseNdjson(response);
+        assert.deepEqual(events.map(event => event.stream), ['orders-1', 'orders-2']);
     } finally {
         await destroyFixture(fixture);
     }

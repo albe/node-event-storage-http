@@ -4,38 +4,6 @@ import { buildReadWindow, collectSelectorLeaves, getQueryValues, parseJson, pars
 import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
 
 /**
- * Normalize selector nodes enough to determine whether the selector collapses
- * to `_all` under the event-storage alternating OR/AND depth semantics.
- *
- * Depth 0 (root) is OR, depth 1 is AND, then it alternates.
- *
- * @param {string|Array<string|Array>} selector
- * @param {number} [depth=0]
- * @returns {string|Array<string|Array>}
- */
-function normalizeSelectorForAll(selector, depth = 0) {
-    if (typeof selector === 'string') {
-        return selector;
-    }
-
-    const normalized = selector.map(node => normalizeSelectorForAll(node, depth + 1));
-    if (normalized.length === 1) {
-        const child = normalized[0];
-        if (!Array.isArray(child)) {
-            return child;
-        }
-        return child.length === 1 ? child[0] : normalized;
-    }
-    if (normalized.every(node => node === normalized[0])) {
-        return normalized[0];
-    }
-    if (depth % 2 !== 0) {
-        return normalized.filter(node => node !== '_all');
-    }
-    return normalized.some(node => node === '_all') ? '_all' : normalized;
-}
-
-/**
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
  * @param {number|undefined} [timeoutMs=10_000] Poll timeout in milliseconds.
@@ -75,11 +43,7 @@ function registerGetJoinRoute(app, { eventStore, options = {}, matcherCache } = 
         const rawOptions = request.params[0] || '';
         const filter = parseMatcher(request.query.filter, 'filter', matcherCache);
         const streamSelector = parseJoinSelector(request);
-        const normalizedSelector = normalizeSelectorForAll(streamSelector);
-        if (normalizedSelector === '_all') {
-            throw new HttpError(400, 'streams must not include "_all" for join reads. Use GET /streams/_all instead.');
-        }
-        const selectorLeaves = collectSelectorLeaves(normalizedSelector);
+        const selectorLeaves = collectSelectorLeaves(streamSelector);
 
         const parsedReadOptions = parseReadOptions(rawOptions);
         const { from, until } = buildReadWindow(eventStore.length, parsedReadOptions);
