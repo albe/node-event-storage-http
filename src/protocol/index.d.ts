@@ -25,6 +25,8 @@ export class MatcherBuilder {
     greaterThanOrEqual(value: number): this;
     lessThan(value: number): this;
     lessThanOrEqual(value: number): this;
+    has(value: unknown): this;
+    hasAny(...values: unknown[]): this;
     build(): ObjectMatcher;
 }
 
