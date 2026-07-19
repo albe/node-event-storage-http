@@ -68,7 +68,7 @@ jobs:
             "package/src/client/index.d.ts"
             "package/src/protocol/index.js"
             "package/src/protocol/index.d.ts"
-            "package/index.d.ts"
+            "package/src/server/index.d.ts"
             "package/README.md"
           )
           for f in "${REQUIRED[@]}"; do
