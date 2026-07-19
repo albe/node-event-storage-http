@@ -444,6 +444,8 @@ test('GET /streams/join accepts _all selectors', async () => {
         assert.equal(response.status, 200);
         const events = await parseNdjson(response);
         assert.deepEqual(events.map(event => event.stream), ['orders-1', 'orders-2']);
+        assert.deepEqual(events.map(event => event.payload.type), ['OrderPlaced', 'OrderPlaced']);
+        assert.deepEqual(events.map(event => event.payload.orderId), ['1', '2']);
     } finally {
         await destroyFixture(fixture);
     }
