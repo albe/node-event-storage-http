@@ -125,6 +125,15 @@ class MatcherBuilder {
         return this.setOperator('$lte', value);
     }
 
+    has(value) {
+        return this.setOperator('$has', value);
+    }
+
+    hasAny(...values) {
+        assert(values.length > 0, 'hasAny(...) requires at least one value.');
+        return this.setOperator('$hasAny', values.length === 1 && Array.isArray(values[0]) ? values[0] : values);
+    }
+
     setValue(value) {
         assert(this.currentSegments, 'call path(...) before adding matcher operations.');
         const { node, key } = getOrCreatePath(this.matcher, this.currentSegments);

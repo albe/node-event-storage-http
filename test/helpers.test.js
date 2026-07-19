@@ -28,6 +28,20 @@ test('MatcherBuilder supports anyOf(...args) as array matcher value', () => {
     });
 });
 
+test('MatcherBuilder supports $has and $hasAny operators', () => {
+    const matcher = new MatcherBuilder()
+        .path('payload.tags').has('featured')
+        .path('payload.categories').hasAny('priority', 'beta')
+        .build();
+
+    assert.deepEqual(matcher, {
+        payload: {
+            tags: { $has: 'featured' },
+            categories: { $hasAny: ['priority', 'beta'] }
+        }
+    });
+});
+
 test('CommitConditionHelper builds and round-trips header values', () => {
     const matcher = new MatcherBuilder()
         .path('payload.type').equals('OrderPlaced')
