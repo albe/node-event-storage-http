@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { HttpError } from '../../http/errors.js';
-import { buildReadWindow, collectSelectorLeaves, getQueryValues, parseJson, parseMatcher, parseReadOptions, parseSelector, parseStreamName } from '../../http/routeUtils.js';
+import { buildReadWindow, getQueryValues, parseJson, parseMatcher, parseReadOptions, parseSelector, parseStreamName } from '../../http/routeUtils.js';
 import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
 
 /**
@@ -43,13 +43,11 @@ function registerGetJoinRoute(app, { eventStore, options = {}, matcherCache } = 
         const rawOptions = request.params[0] || '';
         const filter = parseMatcher(request.query.filter, 'filter', matcherCache);
         const streamSelector = parseJoinSelector(request);
-        const selectorLeaves = collectSelectorLeaves(streamSelector);
 
         const parsedReadOptions = parseReadOptions(rawOptions);
         const { from, until } = buildReadWindow(eventStore.length, parsedReadOptions);
         const version = eventStore.length;
         const joinName = `join:${Date.now()}:${randomUUID()}`;
-        const indexNames = new Set(selectorLeaves.map(name => `stream-${name}`));
 
         await runLongPoll(response, {
             range: { from, until, version },
@@ -57,9 +55,7 @@ function registerGetJoinRoute(app, { eventStore, options = {}, matcherCache } = 
                 'x-event-store-selector': JSON.stringify(streamSelector)
             },
             source: {
-                getAvailableVersionOnIndexAdd: (indexName) => (
-                    indexNames.has(indexName) ? eventStore.length : undefined
-                ),
+                getAvailableVersionOnIndexAdd: () => eventStore.length,
                 createStream: (rangeFrom, rangeUntil) => eventStore.fromStreams(joinName, streamSelector, rangeFrom, rangeUntil, filter, true)
             }
         });
