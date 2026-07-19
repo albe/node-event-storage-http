@@ -97,6 +97,36 @@ test('client round-trips against a server built with createEventStoreHttpServerW
     }
 });
 
+test('client.readJoin supports nested selector algebra', async () => {
+    const fixture = await createFixture({ tagsAccessor: 'tags' });
+    try {
+        const client = new EventStoreHttpClient({ baseUrl: fixture.baseUrl });
+        await client.commit('orders-1', [{ type: 'OrderPlaced', orderId: '1', tags: ['featured', 'eu'] }]);
+        await client.commit('orders-2', [{ type: 'OrderPlaced', orderId: '2', tags: ['featured'] }]);
+
+        const stream = await client.readJoin([['tags/featured', 'tags/eu', ['OrderPlaced']]]);
+        const events = await stream.toArray();
+        assert.deepEqual(events.map(event => event.payload.orderId), ['1']);
+    } finally {
+        await fixture.close();
+    }
+});
+
+test('client.readQuery supports DCB shorthand query objects', async () => {
+    const fixture = await createFixture({ tagsAccessor: 'tags' });
+    try {
+        const client = new EventStoreHttpClient({ baseUrl: fixture.baseUrl });
+        await client.commit('orders-1', [{ type: 'OrderPlaced', orderId: '1', tags: ['featured'] }]);
+        await client.commit('orders-2', [{ type: 'OrderPlaced', orderId: '2', tags: ['archived'] }]);
+
+        const stream = await client.readQuery({ items: [{ types: ['OrderPlaced'], tags: ['featured'] }] });
+        const events = await stream.toArray();
+        assert.deepEqual(events.map(event => event.payload.orderId), ['1']);
+    } finally {
+        await fixture.close();
+    }
+});
+
 test('client.follow yields a batch then stops cleanly on break', async () => {
     const fixture = await createFixture();
     try {
@@ -125,9 +155,9 @@ function fakeStore() {
     };
 }
 
-async function createFixture() {
+async function createFixture(eventStoreConfig = {}) {
     const storageDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'event-storage-http-layers-'));
-    const eventStore = new EventStore({ storageDirectory, typeAccessor: 'type' });
+    const eventStore = new EventStore({ storageDirectory, typeAccessor: 'type', ...eventStoreConfig });
     await once(eventStore, 'ready');
 
     const app = express();

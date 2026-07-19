@@ -7,7 +7,7 @@ const SCAN_DEBOUNCE_MS = 5_000;
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
  * @returns {void}
  */
-function registerGetConsumersRoute(app, eventStore) {
+function registerGetConsumersRoute(app, { eventStore } = {}) {
     let lastScanAt = 0;
 
     /**

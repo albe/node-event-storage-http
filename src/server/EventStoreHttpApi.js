@@ -2,7 +2,7 @@ import http from 'http';
 import express from 'express';
 import { once } from 'events';
 import { HttpError, sendError } from './http/errors.js';
-import { waitForReadyMiddleware } from './http/routeUtils.js';
+import { createMatcherCache, waitForReadyMiddleware } from './http/routeUtils.js';
 import registerGetConsumerRoute from './routes/consumers/getConsumer.js';
 import registerGetConsumersRoute from './routes/consumers/getConsumers.js';
 import registerGetConsumerAfterRoute from './routes/consumers/getConsumerAfter.js';
@@ -21,7 +21,8 @@ import registerPutStreamRoute from './routes/streams/putStream.js';
  * @typedef {{
  *   autoStartConsumers?: boolean|undefined,
  *   consumerPollTimeoutMs?: number|undefined,
- *   streamPollTimeoutMs?: number|undefined
+ *   streamPollTimeoutMs?: number|undefined,
+ *   matcherCacheSize?: number|undefined
  * }} EventStoreHttpApiOptions
  */
 
@@ -57,6 +58,7 @@ class EventStoreHttpApi {
         const storage = eventStore.storage;
         this.eventStore = eventStore;
         this.options = options;
+        this.matcherCache = createMatcherCache(options.matcherCacheSize ?? 100);
         this.server = null;
         this.ready = storage?.initialized === true
             ? Promise.resolve()
@@ -122,21 +124,26 @@ class EventStoreHttpApi {
      */
     _registerRoutes(app, { includeNotFound = false } = {}) {
         app.use(express.json({ limit: '1mb' }));
-        registerGetHealthRoute(app, this.eventStore);
+        const routeParams = {
+            eventStore: this.eventStore,
+            options: this.options,
+            matcherCache: this.matcherCache
+        };
+        registerGetHealthRoute(app, routeParams);
         app.use((request, response, next) => waitForReadyMiddleware(this.ready, request, response, next));
 
-        registerGetConsumersRoute(app, this.eventStore);
-        registerGetConsumerRoute(app, this.eventStore);
-        registerGetConsumerAfterRoute(app, this.eventStore, this.options.consumerPollTimeoutMs ?? 10_000);
-        registerPutConsumerRoute(app, this.eventStore);
-        registerGetQueryRoute(app, this.eventStore);
-        registerGetJoinRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000);
-        registerGetCategoryRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000);
-        registerGetStreamsRoute(app, this.eventStore);
-        registerPostCommitRoute(app, this.eventStore);
-        registerGetVersionRoute(app, this.eventStore);
-        registerGetStreamRoute(app, this.eventStore, this.options.streamPollTimeoutMs ?? 10_000);
-        registerPutStreamRoute(app, this.eventStore);
+        registerGetConsumersRoute(app, routeParams);
+        registerGetConsumerRoute(app, routeParams);
+        registerGetConsumerAfterRoute(app, routeParams);
+        registerPutConsumerRoute(app, routeParams);
+        registerGetQueryRoute(app, routeParams);
+        registerGetJoinRoute(app, routeParams);
+        registerGetCategoryRoute(app, routeParams);
+        registerGetStreamsRoute(app, routeParams);
+        registerPostCommitRoute(app, routeParams);
+        registerGetVersionRoute(app, routeParams);
+        registerGetStreamRoute(app, routeParams);
+        registerPutStreamRoute(app, routeParams);
 
         /**
          * @param {import('express').Request} request Express request.

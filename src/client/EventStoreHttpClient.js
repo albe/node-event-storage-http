@@ -14,7 +14,8 @@ import HttpEventStream from './HttpEventStream.js';
  * @typedef {{
  *   kind: 'stream'|'category'|'join',
  *   name?: string|undefined,
- *   streams?: string[]|undefined
+ *   streams?: string[]|undefined,
+ *   selector?: string|Array<string|any>|undefined
  * }} FollowSource
  */
 
@@ -72,6 +73,10 @@ class EventStoreHttpClient {
             return `/streams/category/${encodeURIComponent(source.name)}${range}`;
         }
         if (source.kind === 'join') {
+            if (source.selector !== undefined) {
+                const selector = encodeURIComponent(JSON.stringify(source.selector));
+                return `/streams/join${range}?selector=${selector}`;
+            }
             const streams = source.streams.map(name => encodeURIComponent(name)).join(',');
             return `/streams/join${range}?streams=${streams}`;
         }
@@ -99,12 +104,34 @@ class EventStoreHttpClient {
     }
 
     /**
-     * @param {string[]} streams Stream names to join.
+     * @param {string[]|string|Array<string|any>} selectorOrStreams Join selector (nested algebra) or flat stream names.
      * @param {{from?: number, until?: number, signal?: AbortSignal}} [options={}] Read window.
      * @returns {Promise<HttpEventStream>} NDJSON event stream.
      */
-    async readJoin(streams, { from = 1, until, signal } = {}) {
-        const res = await this._request('GET', this._readPath({ kind: 'join', streams }, from, until), { signal });
+    async readJoin(selectorOrStreams, { from = 1, until, signal } = {}) {
+        const source = { kind: 'join', selector: selectorOrStreams };
+        const res = await this._request('GET', this._readPath(source, from, until), { signal });
+        return new HttpEventStream(res);
+    }
+
+    /**
+     * @param {string[]|object} selectorOrQuery Legacy types array or DCB query object.
+     * @param {{from?: number, filter?: object|null, signal?: AbortSignal}} [options={}] Query options.
+     * @returns {Promise<HttpEventStream>} NDJSON event stream.
+     */
+    async readQuery(selectorOrQuery, { from, filter = null, signal } = {}) {
+        const queryParams = [];
+        if (Array.isArray(selectorOrQuery)) {
+            queryParams.push(`types=${selectorOrQuery.map(type => encodeURIComponent(type)).join(',')}`);
+        } else {
+            queryParams.push(`query=${encodeURIComponent(JSON.stringify(selectorOrQuery))}`);
+        }
+        if (filter) {
+            queryParams.push(`filter=${encodeURIComponent(JSON.stringify(filter))}`);
+        }
+        const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+        const fromPath = from !== undefined ? `/from/${from}` : '';
+        const res = await this._request('GET', `/query${fromPath}${queryString}`, { signal });
         return new HttpEventStream(res);
     }
 

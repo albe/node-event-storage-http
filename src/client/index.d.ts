@@ -50,16 +50,24 @@ export interface EventStoreHttpClientOptions {
 }
 
 export type FollowSourceKind = 'stream' | 'category' | 'join';
+export type StreamSelector = string | StreamSelector[];
 
 export interface FollowSource {
     kind: FollowSourceKind;
     name?: string;
     streams?: string[];
+    selector?: StreamSelector;
 }
 
 export interface ReadOptions {
     from?: number;
     until?: number;
+    signal?: AbortSignal;
+}
+
+export interface QueryReadOptions {
+    from?: number;
+    filter?: object | null;
     signal?: AbortSignal;
 }
 
@@ -90,7 +98,8 @@ export class EventStoreHttpClient {
 
     readStream(name: string, options?: ReadOptions): Promise<HttpEventStream>;
     readCategory(name: string, options?: ReadOptions): Promise<HttpEventStream>;
-    readJoin(streams: string[], options?: ReadOptions): Promise<HttpEventStream>;
+    readJoin(selectorOrStreams: StreamSelector, options?: ReadOptions): Promise<HttpEventStream>;
+    readQuery(selectorOrQuery: string[] | Record<string, unknown>, options?: QueryReadOptions): Promise<HttpEventStream>;
     follow(source: FollowSource, options?: FollowOptions): AsyncGenerator<FollowBatch, void, undefined>;
     commit(stream: string, events: object[], options?: CommitOptions): Promise<Record<string, unknown>>;
     health(): Promise<Record<string, unknown>>;

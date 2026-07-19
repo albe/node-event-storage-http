@@ -6,7 +6,7 @@ import { parseConsumerIdentifier } from '../../http/routeUtils.js';
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
  * @returns {void}
  */
-function registerGetConsumerRoute(app, eventStore) {
+function registerGetConsumerRoute(app, { eventStore } = {}) {
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.

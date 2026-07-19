@@ -77,4 +77,11 @@ test('CommitConditionHelper matcher(...) alias behaves like matching(...)', () =
     assert.deepEqual(condition.matcher, matcher);
 });
 
+test('CommitConditionHelper selector(...) supports nested selector algebra', () => {
+    const condition = new CommitConditionHelper()
+        .selector([['tags/featured', ['OrderPlaced', 'OrderConfirmed']]])
+        .noneMatchAfter(12)
+        .build();
 
+    assert.deepEqual(condition.selector, [['tags/featured', ['OrderPlaced', 'OrderConfirmed']]]);
+});

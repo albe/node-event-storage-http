@@ -6,9 +6,11 @@ import { createLongPollRunner } from '../../http/longPollRouteUtil.js';
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
  * @param {number|undefined} [timeoutMs=10_000] Poll timeout in milliseconds.
+ * @param {{ get(raw: string): object|undefined, set(raw: string, matcher: object): object }|undefined} [matcherCache] Optional matcher cache.
  * @returns {void}
  */
-function registerGetCategoryRoute(app, eventStore, timeoutMs = 10_000) {
+function registerGetCategoryRoute(app, { eventStore, options = {}, matcherCache } = {}) {
+    const timeoutMs = options.streamPollTimeoutMs ?? 10_000;
     const runLongPoll = createLongPollRunner(eventStore, timeoutMs);
 
     /**
@@ -18,7 +20,7 @@ function registerGetCategoryRoute(app, eventStore, timeoutMs = 10_000) {
      */
     const handleGetCategory = async (request, response) => {
         const { resourceName: category, options } = splitReadStreamPath(request.params[0]);
-        const filter = parseMatcher(request.query.filter, 'filter');
+        const filter = parseMatcher(request.query.filter, 'filter', matcherCache);
 
         const categoryStreams = Object.keys(eventStore.streams).filter(streamName =>
             streamName.startsWith(category + '-') ||

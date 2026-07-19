@@ -2,8 +2,42 @@ import { CommitCondition, ExpectedVersion } from 'event-storage';
 import { HttpError } from './errors.js';
 
 const readOptionNames = new Set(['from', 'until', 'forwards', 'backwards']);
-const streamNamePattern = /^[A-Za-z0-9][A-Za-z0-9_]*(?:[\/.-][A-Za-z0-9][A-Za-z0-9_]*)*$/;
+const streamNameSeparators = ['/', ':', '@', '~', '+', '=', '-', '#', '.'];
+const streamNamePattern = /^[A-Za-z0-9][A-Za-z0-9_]*(?:[\/:@~+=\-#.][A-Za-z0-9][A-Za-z0-9_]*)*$/;
 const consumerIdentifierPattern = /^[A-Za-z0-9_-]+$/;
+
+function createMatcherCache(maxEntries = 100) {
+    const maxSize = Number.isInteger(maxEntries) ? Math.max(0, maxEntries) : 100;
+    const entries = new Map();
+
+    return {
+        get(raw) {
+            if (maxSize === 0 || !entries.has(raw)) {
+                return undefined;
+            }
+            const matcher = entries.get(raw);
+            entries.delete(raw);
+            entries.set(raw, matcher);
+            return matcher;
+        },
+        set(raw, matcher) {
+            if (maxSize === 0) {
+                return matcher;
+            }
+            if (entries.has(raw)) {
+                entries.delete(raw);
+            } else if (entries.size >= maxSize) {
+                const oldestKey = entries.keys().next().value;
+                entries.delete(oldestKey);
+            }
+            entries.set(raw, matcher);
+            return matcher;
+        },
+        get size() {
+            return entries.size;
+        }
+    };
+}
 
 /**
  * @param {string} raw Raw JSON text (must not be null/undefined).
@@ -21,17 +55,59 @@ function parseJson(raw, what) {
 /**
  * @param {object|string|undefined} value Matcher candidate value.
  * @param {string} source Source label used in error messages.
+ * @param {{ get(raw: string): object|undefined, set(raw: string, matcher: object): object }|undefined} [matcherCache] Optional matcher cache.
  * @returns {object|null} Parsed matcher object, or null when value is empty.
  */
-function parseMatcher(value, source) {
+function parseMatcher(value, source, matcherCache = undefined) {
     if (value === undefined || value === null || value === '') {
         return null;
     }
-    const matcher = typeof value === 'string' ? parseJson(value, source) : value;
+    if (typeof value === 'string') {
+        const cachedMatcher = matcherCache?.get(value);
+        if (cachedMatcher) {
+            return cachedMatcher;
+        }
+        const parsedMatcher = parseJson(value, source);
+        if (!parsedMatcher || typeof parsedMatcher !== 'object' || Array.isArray(parsedMatcher)) {
+            throw new HttpError(400, `${source} must be a JSON object.`);
+        }
+        return matcherCache?.set(value, parsedMatcher) ?? parsedMatcher;
+    }
+    const matcher = value;
     if (!matcher || typeof matcher !== 'object' || Array.isArray(matcher)) {
         throw new HttpError(400, `${source} must be a JSON object.`);
     }
     return matcher;
+}
+
+/**
+ * @param {string|string[]|unknown[]|unknown} selector Candidate selector algebra value.
+ * @param {string} source Source label used in error messages.
+ * @param {boolean} [allowAll=true] Allow the reserved `_all` stream name.
+ * @returns {string|string[]} Parsed selector.
+ */
+function parseSelector(selector, source, allowAll = true) {
+    if (typeof selector === 'string') {
+        return parseStreamName(selector, source, allowAll);
+    }
+    if (!Array.isArray(selector) || selector.length === 0) {
+        throw new HttpError(400, `${source} must be a non-empty selector array or stream name.`);
+    }
+    return selector.map((item, index) => parseSelector(item, `${source}[${index}]`, allowAll));
+}
+
+/**
+ * @param {string|string[]|unknown[]|unknown} selector Selector to inspect.
+ * @returns {string[]} All selector stream-name leaves.
+ */
+function collectSelectorLeaves(selector) {
+    if (typeof selector === 'string') {
+        return [selector];
+    }
+    if (!Array.isArray(selector)) {
+        return [];
+    }
+    return selector.flatMap(item => collectSelectorLeaves(item));
 }
 
 /**
@@ -62,9 +138,10 @@ function parseExpectedVersion(value) {
 
 /**
  * @param {object|string|undefined} value Condition object or JSON string.
+ * @param {{ get(raw: string): object|undefined, set(raw: string, matcher: object): object }|undefined} [matcherCache] Optional matcher cache.
  * @returns {CommitCondition|null} Parsed commit condition or null when omitted.
  */
-function parseCondition(value) {
+function parseCondition(value, matcherCache = undefined) {
     if (value === undefined || value === null) {
         return null;
     }
@@ -72,15 +149,17 @@ function parseCondition(value) {
     if (!condition || typeof condition !== 'object' || Array.isArray(condition)) {
         throw new HttpError(400, 'condition must be a JSON object.');
     }
-    if (!Array.isArray(condition.types) || condition.types.length === 0 || !condition.types.every(type => typeof type === 'string' && type !== '')) {
-        throw new HttpError(400, 'condition.types must be a non-empty string array.');
-    }
     if (!Number.isInteger(condition.noneMatchAfter) || condition.noneMatchAfter < 0) {
         throw new HttpError(400, 'condition.noneMatchAfter must be a non-negative integer.');
     }
-    const matcher = parseMatcher(condition.matcher, 'condition.matcher');
+    const selectorCandidate = condition.selector ?? condition.types;
+    if (selectorCandidate === undefined) {
+        throw new HttpError(400, 'condition.selector (or condition.types) is required.');
+    }
+    const selector = parseSelector(selectorCandidate, condition.selector !== undefined ? 'condition.selector' : 'condition.types', true);
+    const matcher = parseMatcher(condition.matcher, 'condition.matcher', matcherCache);
     return new CommitCondition(
-        condition.types,
+        selector,
         matcher,
         condition.noneMatchAfter
     );
@@ -92,8 +171,9 @@ function parseCondition(value) {
  * @returns {string} JSON string representation.
  */
 function serializeCondition(condition, matcher = null) {
+    const selector = condition.selector ?? condition.types;
     return JSON.stringify({
-        types: condition.types,
+        ...(selector !== undefined ? { selector } : {}),
         noneMatchAfter: condition.noneMatchAfter,
         ...(matcher ? { matcher } : {})
     });
@@ -151,7 +231,7 @@ function parseStreamName(value, source = 'stream', allowAll = false) {
         return value;
     }
     if (!streamNamePattern.test(value)) {
-        throw new HttpError(400, `${source} must use segments that start with a letter or number and may contain letters, numbers, "-", "_", ".", and "/".`);
+        throw new HttpError(400, `${source} must use segments that start with a letter or number and may contain letters, numbers, "_", and separators: / : @ ~ + = - # .`);
     }
     return value;
 }
@@ -386,14 +466,18 @@ export {
     buildReadWindow,
     buildConsumerName,
     commitAsync,
+    collectSelectorLeaves,
+    createMatcherCache,
     getQueryValues,
     parseCondition,
     parseExpectedVersion,
     parseMatcher,
+    parseJson,
     parsePositiveInteger,
     parseReadOptions,
     parseConsumerIdentifier,
     parseRevision,
+    parseSelector,
     parseSegmentOptions,
     parseStreamName,
     resolveBoundary,

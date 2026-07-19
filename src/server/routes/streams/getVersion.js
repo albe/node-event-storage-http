@@ -6,7 +6,7 @@ import { parseStreamName } from '../../http/routeUtils.js';
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
  * @returns {void}
  */
-function registerGetVersionRoute(app, eventStore) {
+function registerGetVersionRoute(app, { eventStore } = {}) {
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.

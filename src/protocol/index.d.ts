@@ -4,9 +4,11 @@
  */
 
 export type ObjectMatcher = Record<string, unknown>;
+export type StreamSelector = string | StreamSelector[];
 
 export interface SerializedCommitCondition {
-    types: string[];
+    selector?: StreamSelector;
+    types?: string[];
     noneMatchAfter: number;
     matcher?: Record<string, unknown>;
 }
@@ -30,12 +32,13 @@ export class CommitConditionHelper {
     static readonly headerName: 'x-event-store-query-condition';
 
     types(types: string[]): this;
+    selector(selector: StreamSelector): this;
     noneMatchAfter(noneMatchAfter: number): this;
     matching(matcher: ObjectMatcher | undefined): this;
     matcher(matcher: ObjectMatcher | undefined): this;
     build(): SerializedCommitCondition;
 
-    static create(types: string[], noneMatchAfter: number, matcher?: ObjectMatcher): SerializedCommitCondition;
+    static create(selectorOrTypes: StreamSelector | string[], noneMatchAfter: number, matcher?: ObjectMatcher): SerializedCommitCondition;
     static toHeaderValue(condition: SerializedCommitCondition): string;
     static parseHeaderValue(headerValue: string): SerializedCommitCondition;
     static fromHeaders(headers: { get?(name: string): string | null } | undefined): SerializedCommitCondition | null;

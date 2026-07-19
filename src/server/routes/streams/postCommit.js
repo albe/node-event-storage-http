@@ -4,9 +4,10 @@ import { commitAsync, parseCondition, parseExpectedVersion, parseStreamName } fr
 /**
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
  * @param {import('event-storage').EventStore} eventStore EventStore instance passed through to commit helpers.
+ * @param {{ get(raw: string): object|undefined, set(raw: string, matcher: object): object }|undefined} [matcherCache] Optional matcher cache.
  * @returns {void}
  */
-function registerPostCommitRoute(app, eventStore) {
+function registerPostCommitRoute(app, { eventStore, matcherCache } = {}) {
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
@@ -23,7 +24,7 @@ function registerPostCommitRoute(app, eventStore) {
         }
 
         const expectedVersion = body.condition !== undefined
-            ? parseCondition(body.condition)
+            ? parseCondition(body.condition, matcherCache)
             : parseExpectedVersion(body.expectedVersion);
         const metadata = body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? body.metadata : {};
         const commit = await commitAsync(eventStore, streamName, body.events, expectedVersion, metadata);
