@@ -152,6 +152,7 @@ await fetch('http://127.0.0.1:3000/streams/orders-1/commit', {
 
 - `POST /streams/{stream}/commit`
 - `PUT /streams/{stream}`
+- `POST /streams/{stream}/close`
 - `GET /streams`
 - `GET /streams/{stream}[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]`
 - `GET /streams/{stream}/version`
@@ -216,6 +217,22 @@ or
     "payload": { "type": "OrderPlaced" }
   }
 }
+```
+
+`POST /streams/{stream}/close` closes a stream index, making it read-only from that point on. Closed streams are removed from the write path so new commits no longer update their index, but they remain readable.
+
+- Path params:
+  - `stream`: name of the stream to close.
+- Returns `200` with `{ stream, closed: true }` on success.
+- Returns `404` when the stream does not exist.
+- Returns `409` when the stream is already closed or the store is read-only.
+
+```http
+POST /streams/orders-1/close
+```
+
+```json
+{ "stream": "orders-1", "closed": true }
 ```
 
 `GET /streams` returns all known streams from the in-memory stream registry, including `stream`, `closed`, `version`, and `metadata`.

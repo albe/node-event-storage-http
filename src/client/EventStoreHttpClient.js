@@ -198,6 +198,16 @@ class EventStoreHttpClient {
     }
 
     /**
+     * @param {string} stream Stream name to close.
+     * @param {{signal?: AbortSignal}} [options={}] Request options.
+     * @returns {Promise<object>} The close result `{ stream, closed }`.
+     */
+    async closeStream(stream, { signal } = {}) {
+        const res = await this._request('POST', `/streams/${encodeURIComponent(stream)}/close`, { signal });
+        return res.json();
+    }
+
+    /**
      * @returns {Promise<object>} Server health payload.
      */
     async health() {

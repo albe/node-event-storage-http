@@ -312,6 +312,101 @@ test('GET /streams lists stream name, closed state, version, and metadata', asyn
     }
 });
 
+test('POST /streams/:stream/close closes the stream and marks it read-only', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const closeResponse = await fetch(`${fixture.baseUrl}/streams/orders-1/close`, { method: 'POST' });
+        assert.equal(closeResponse.status, 200);
+        assert.deepEqual(await closeResponse.json(), { stream: 'orders-1', closed: true });
+
+        // Further commits should now be rejected.
+        const commitAfterClose = await fetch(`${fixture.baseUrl}/streams/orders-1/commit`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ events: [{ type: 'OrderConfirmed', orderId: '1' }] })
+        });
+        assert.equal(commitAfterClose.status, 409);
+        const commitError = await commitAfterClose.json();
+        assert.ok(commitError.error.includes('already closed'));
+
+        // The stream is now flagged as closed in the registry.
+        const listResponse = await fetch(`${fixture.baseUrl}/streams`);
+        assert.equal(listResponse.status, 200);
+        const { streams } = await listResponse.json();
+        const entry = streams.find(s => s.stream === 'orders-1');
+        assert.ok(entry, 'stream should still appear in the list after close');
+        assert.equal(entry.closed, true);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('POST /streams/:stream/close returns 404 when the stream does not exist', async () => {
+    const fixture = await createFixture();
+    try {
+        const response = await fetch(`${fixture.baseUrl}/streams/no-such-stream/close`, { method: 'POST' });
+        assert.equal(response.status, 404);
+        const body = await response.json();
+        assert.ok(body.error.includes('does not exist'));
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('POST /streams/:stream/close returns 409 when the stream is already closed', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        fixture.eventStore.closeEventStream('orders-1');
+
+        const response = await fetch(`${fixture.baseUrl}/streams/orders-1/close`, { method: 'POST' });
+        assert.equal(response.status, 409);
+        const body = await response.json();
+        assert.ok(body.error.includes('already closed'));
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('POST /streams/:stream/close returns 409 on a read-only store', async () => {
+    const storageDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'event-storage-http-close-ro-'));
+    let writableStore;
+    let readOnlyStore;
+    let server;
+    try {
+        writableStore = new EventStore({ storageDirectory, typeAccessor: 'type' });
+        await once(writableStore, 'ready');
+        await commitAsync(writableStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        writableStore.close();
+
+        readOnlyStore = new EventStore({ storageDirectory, readOnly: true, typeAccessor: 'type' });
+        await once(readOnlyStore, 'ready');
+
+        const api = new EventStoreHttpApi(readOnlyStore);
+        server = api.createServer();
+        await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+        const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+        const response = await fetch(`${baseUrl}/streams/orders-1/close`, { method: 'POST' });
+        assert.equal(response.status, 409);
+        const body = await response.json();
+        assert.ok(body.error.includes('read-only'));
+    } finally {
+        if (server) {
+            await new Promise(resolve => server.close(resolve));
+        }
+        if (readOnlyStore) {
+            readOnlyStore.close();
+        }
+        if (writableStore) {
+            writableStore.close();
+        }
+        await fs.rm(storageDirectory, { recursive: true, force: true });
+    }
+});
+
 test('GET /streams/:stream with until > version long-polls and streams forward until target version', async () => {
     const fixture = await createFixture();
     try {
