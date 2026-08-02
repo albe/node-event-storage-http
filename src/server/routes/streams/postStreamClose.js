@@ -6,13 +6,13 @@ import { parseStreamName } from '../../http/routeUtils.js';
  * @param {import('event-storage').EventStore} eventStore EventStore instance.
  * @returns {void}
  */
-function registerDeleteStreamRoute(app, { eventStore } = {}) {
+function registerPostStreamCloseRoute(app, { eventStore } = {}) {
     /**
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
      * @returns {void}
      */
-    const handleDeleteStream = (request, response) => {
+    const handlePostStreamClose = (request, response) => {
         const streamName = parseStreamName(decodeURIComponent(request.params[0]));
         try {
             eventStore.closeEventStream(streamName);
@@ -32,7 +32,7 @@ function registerDeleteStreamRoute(app, { eventStore } = {}) {
         sendJson(response, 200, { stream: streamName, closed: true });
     };
 
-    app.delete(/^\/streams\/(.+)$/, handleDeleteStream);
+    app.post(/^\/streams\/(.+)\/close$/, handlePostStreamClose);
 }
 
-export default registerDeleteStreamRoute;
+export default registerPostStreamCloseRoute;

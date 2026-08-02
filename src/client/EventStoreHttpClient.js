@@ -203,7 +203,7 @@ class EventStoreHttpClient {
      * @returns {Promise<object>} The close result `{ stream, closed }`.
      */
     async closeStream(stream, { signal } = {}) {
-        const res = await this._request('DELETE', `/streams/${encodeURIComponent(stream)}`, { signal });
+        const res = await this._request('POST', `/streams/${encodeURIComponent(stream)}/close`, { signal });
         return res.json();
     }
 

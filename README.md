@@ -152,7 +152,7 @@ await fetch('http://127.0.0.1:3000/streams/orders-1/commit', {
 
 - `POST /streams/{stream}/commit`
 - `PUT /streams/{stream}`
-- `DELETE /streams/{stream}`
+- `POST /streams/{stream}/close`
 - `GET /streams`
 - `GET /streams/{stream}[/from/{from}][/until/{until}][/forwards/{amount}][/backwards/{amount}]`
 - `GET /streams/{stream}/version`
@@ -219,7 +219,7 @@ or
 }
 ```
 
-`DELETE /streams/{stream}` closes a stream index, making it read-only from that point on. Closed streams are removed from the write path so new commits no longer update their index, but they remain readable.
+`POST /streams/{stream}/close` closes a stream index, making it read-only from that point on. Closed streams are removed from the write path so new commits no longer update their index, but they remain readable.
 
 - Path params:
   - `stream`: name of the stream to close.
@@ -228,7 +228,7 @@ or
 - Returns `409` when the stream is already closed or the store is read-only.
 
 ```http
-DELETE /streams/orders-1
+POST /streams/orders-1/close
 ```
 
 ```json

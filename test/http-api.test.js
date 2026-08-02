@@ -312,14 +312,14 @@ test('GET /streams lists stream name, closed state, version, and metadata', asyn
     }
 });
 
-test('DELETE /streams/:stream closes the stream and marks it read-only', async () => {
+test('POST /streams/:stream/close closes the stream and marks it read-only', async () => {
     const fixture = await createFixture();
     try {
         await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
 
-        const deleteResponse = await fetch(`${fixture.baseUrl}/streams/orders-1`, { method: 'DELETE' });
-        assert.equal(deleteResponse.status, 200);
-        assert.deepEqual(await deleteResponse.json(), { stream: 'orders-1', closed: true });
+        const closeResponse = await fetch(`${fixture.baseUrl}/streams/orders-1/close`, { method: 'POST' });
+        assert.equal(closeResponse.status, 200);
+        assert.deepEqual(await closeResponse.json(), { stream: 'orders-1', closed: true });
 
         // The stream is now flagged as closed in the registry.
         const listResponse = await fetch(`${fixture.baseUrl}/streams`);
@@ -333,10 +333,10 @@ test('DELETE /streams/:stream closes the stream and marks it read-only', async (
     }
 });
 
-test('DELETE /streams/:stream returns 404 when the stream does not exist', async () => {
+test('POST /streams/:stream/close returns 404 when the stream does not exist', async () => {
     const fixture = await createFixture();
     try {
-        const response = await fetch(`${fixture.baseUrl}/streams/no-such-stream`, { method: 'DELETE' });
+        const response = await fetch(`${fixture.baseUrl}/streams/no-such-stream/close`, { method: 'POST' });
         assert.equal(response.status, 404);
         const body = await response.json();
         assert.ok(body.error.includes('does not exist'));
@@ -345,13 +345,13 @@ test('DELETE /streams/:stream returns 404 when the stream does not exist', async
     }
 });
 
-test('DELETE /streams/:stream returns 409 when the stream is already closed', async () => {
+test('POST /streams/:stream/close returns 409 when the stream is already closed', async () => {
     const fixture = await createFixture();
     try {
         await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
         fixture.eventStore.closeEventStream('orders-1');
 
-        const response = await fetch(`${fixture.baseUrl}/streams/orders-1`, { method: 'DELETE' });
+        const response = await fetch(`${fixture.baseUrl}/streams/orders-1/close`, { method: 'POST' });
         assert.equal(response.status, 409);
         const body = await response.json();
         assert.ok(body.error.includes('already closed'));
@@ -360,7 +360,7 @@ test('DELETE /streams/:stream returns 409 when the stream is already closed', as
     }
 });
 
-test('DELETE /streams/:stream returns 409 on a read-only store', async () => {
+test('POST /streams/:stream/close returns 409 on a read-only store', async () => {
     const storageDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'event-storage-http-close-ro-'));
     let writableStore;
     let readOnlyStore;
@@ -379,7 +379,7 @@ test('DELETE /streams/:stream returns 409 on a read-only store', async () => {
         await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
         const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
-        const response = await fetch(`${baseUrl}/streams/orders-1`, { method: 'DELETE' });
+        const response = await fetch(`${baseUrl}/streams/orders-1/close`, { method: 'POST' });
         assert.equal(response.status, 409);
         const body = await response.json();
         assert.ok(body.error.includes('read-only'));
