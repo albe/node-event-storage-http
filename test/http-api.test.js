@@ -321,6 +321,16 @@ test('POST /streams/:stream/close closes the stream and marks it read-only', asy
         assert.equal(closeResponse.status, 200);
         assert.deepEqual(await closeResponse.json(), { stream: 'orders-1', closed: true });
 
+        // Further commits should now be rejected.
+        const commitAfterClose = await fetch(`${fixture.baseUrl}/streams/orders-1/commit`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ events: [{ type: 'OrderConfirmed', orderId: '1' }] })
+        });
+        assert.equal(commitAfterClose.status, 409);
+        const commitError = await commitAfterClose.json();
+        assert.ok(commitError.error.includes('already closed'));
+
         // The stream is now flagged as closed in the registry.
         const listResponse = await fetch(`${fixture.baseUrl}/streams`);
         assert.equal(listResponse.status, 200);
