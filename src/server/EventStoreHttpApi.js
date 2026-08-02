@@ -15,6 +15,7 @@ import registerGetStreamsRoute from './routes/streams/getStreams.js';
 import registerGetStreamRoute from './routes/streams/getStream.js';
 import registerGetVersionRoute from './routes/streams/getVersion.js';
 import registerPostCommitRoute from './routes/streams/postCommit.js';
+import registerDeleteStreamRoute from './routes/streams/deleteStream.js';
 import registerPutStreamRoute from './routes/streams/putStream.js';
 
 /**
@@ -144,6 +145,7 @@ class EventStoreHttpApi {
         registerGetVersionRoute(app, routeParams);
         registerGetStreamRoute(app, routeParams);
         registerPutStreamRoute(app, routeParams);
+        registerDeleteStreamRoute(app, routeParams);
 
         /**
          * @param {import('express').Request} request Express request.
