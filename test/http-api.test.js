@@ -453,6 +453,28 @@ test('GET /streams/_all and /streams/_all/version expose the global stream', asy
     }
 });
 
+test('GET /streams/_all with until > version long-polls and wakes on any write', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+
+        const responsePromise = fetch(`${fixture.baseUrl}/streams/_all/until/2/from/2`);
+
+        await new Promise(resolve => setTimeout(resolve, 25));
+        await commitAsync(fixture.eventStore, 'users-1', [{ type: 'UserCreated', userId: '1' }]);
+
+        const response = await responsePromise;
+        assert.equal(response.status, 200);
+
+        const events = await parseNdjson(response);
+        assert.equal(events.length, 1);
+        assert.equal(events[0].stream, 'users-1');
+        assert.equal(events[0].payload.type, 'UserCreated');
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('GET /streams/:stream with until > version returns 408 on timeout', async () => {
     const fixture = await createFixture();
     try {

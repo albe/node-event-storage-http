@@ -26,6 +26,7 @@ function registerGetStreamRoute(app, { eventStore, options = {}, matcherCache } 
             throw new HttpError(404, `Stream "${streamName}" does not exist.`);
         }
         const { from, until } = buildReadWindow(version, options);
+        const targetIndexName = streamName === '_all' ? '_all' : `stream-${streamName}`;
 
         await runLongPoll(response, {
             range: { from, until, version },
@@ -35,7 +36,7 @@ function registerGetStreamRoute(app, { eventStore, options = {}, matcherCache } 
             },
             source: {
                 getAvailableVersionOnIndexAdd: (indexName, indexLength) => (
-                    indexName === `stream-${streamName}` ? indexLength : undefined
+                    indexName === targetIndexName ? indexLength : undefined
                 ),
                 createStream: (rangeFrom, rangeUntil) => eventStore.getEventStream(streamName, rangeFrom, rangeUntil, filter, true)
             }
