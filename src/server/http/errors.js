@@ -32,7 +32,7 @@ function mapErrorStatus(error) {
     if (/does not exist|No streams for category/.test(error.message)) {
         return 404;
     }
-    if (/already exists|already closed|Can not recreate stream|read-only mode|Optimistic concurrency error/.test(error.message)) {
+    if (/already exists|already closed|is closed|Can not recreate stream|read-only mode|Optimistic concurrency error/.test(error.message)) {
         return 409;
     }
     if (/Must specify|Must provide|Invalid|No events specified|Specify either/.test(error.message)) {

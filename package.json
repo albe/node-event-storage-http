@@ -68,7 +68,7 @@
     }
   },
   "devDependencies": {
-    "event-storage": "^1.4.0",
+    "event-storage": "^1.4.1",
     "express": "^5.2.1"
   }
 }

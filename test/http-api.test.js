@@ -329,7 +329,7 @@ test('POST /streams/:stream/close closes the stream and marks it read-only', asy
         });
         assert.equal(commitAfterClose.status, 409);
         const commitError = await commitAfterClose.json();
-        assert.ok(commitError.error.includes('already closed'));
+        assert.ok(commitError.error.includes('closed'));
 
         // The stream is now flagged as closed in the registry.
         const listResponse = await fetch(`${fixture.baseUrl}/streams`);
