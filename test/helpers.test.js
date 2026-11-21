@@ -42,6 +42,21 @@ test('MatcherBuilder supports $has and $hasAny operators', () => {
     });
 });
 
+test('MatcherBuilder supports the $startsWith operator', () => {
+    const matcher = new MatcherBuilder()
+        .path('payload.type').startsWith('Order')
+        .path('payload.amount').greaterThan(10)
+        .build();
+
+    assert.deepEqual(matcher, {
+        payload: {
+            type: { $startsWith: 'Order' },
+            amount: { $gt: 10 }
+        }
+    });
+    assert.throws(() => new MatcherBuilder().path('payload.type').startsWith(''), TypeError);
+});
+
 test('CommitConditionHelper builds and round-trips header values', () => {
     const matcher = new MatcherBuilder()
         .path('payload.type').equals('OrderPlaced')

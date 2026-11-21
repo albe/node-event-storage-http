@@ -27,6 +27,7 @@ export class MatcherBuilder {
     lessThanOrEqual(value: number): this;
     has(value: unknown): this;
     hasAny(...values: unknown[]): this;
+    startsWith(prefix: string): this;
     build(): ObjectMatcher;
 }
 

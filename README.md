@@ -309,7 +309,7 @@ On startup, `EventStoreHttpApi` calls `eventStore.scanConsumers()` once to pre-p
 
 Raw-mode matcher notes:
 
-- Object matchers are evaluated using the same core matcher semantics as `event-storage`, including nested equality, array OR values, scalar operators (`$gt`, `$gte`, `$lt`, `$lte`, `$eq`, `$ne`), and array-containment operators (`$has`, `$hasAny`).
+- Object matchers are evaluated using the same core matcher semantics as `event-storage`, including nested equality, array OR values, scalar operators (`$gt`, `$gte`, `$lt`, `$lte`, `$eq`, `$ne`), array-containment operators (`$has`, `$hasAny`), and string prefixes (`$startsWith`).
 - Object matchers are evaluated against compact JSON bytes (no parsing in the HTTP layer).
 - Function matchers in raw mode receive a raw document `Buffer`.
 - Raw object matchers require the default compact JSON serializer format.

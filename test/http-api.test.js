@@ -772,6 +772,25 @@ test('GET /query treats non-existing type streams as empty', async () => {
     }
 });
 
+test('GET /query supports $startsWith matchers', async () => {
+    const fixture = await createFixture();
+    try {
+        await commitAsync(fixture.eventStore, 'orders-1', [
+            { type: 'OrderPlaced', region: 'eu-west' },
+            { type: 'OrderPlaced', region: 'us-east' }
+        ]);
+
+        const filter = encodeURIComponent(JSON.stringify({ payload: { region: { $startsWith: 'eu-' } } }));
+        const response = await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter}`);
+        assert.equal(response.status, 200);
+
+        const events = await parseNdjson(response);
+        assert.deepEqual(events.map(event => event.payload.region), ['eu-west']);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
 test('GET /query supports $hasAny array matchers', async () => {
     const fixture = await createFixture();
     try {

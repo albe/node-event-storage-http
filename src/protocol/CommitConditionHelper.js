@@ -134,6 +134,11 @@ class MatcherBuilder {
         return this.setOperator('$hasAny', values.length === 1 && Array.isArray(values[0]) ? values[0] : values);
     }
 
+    startsWith(prefix) {
+        assert(typeof prefix === 'string' && prefix !== '', 'startsWith(...) requires a non-empty string prefix.');
+        return this.setOperator('$startsWith', prefix);
+    }
+
     setValue(value) {
         assert(this.currentSegments, 'call path(...) before adding matcher operations.');
         const { node, key } = getOrCreatePath(this.matcher, this.currentSegments);
