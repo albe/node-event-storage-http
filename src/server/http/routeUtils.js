@@ -152,11 +152,10 @@ function parseCondition(value, matcherCache = undefined) {
     if (!Number.isInteger(condition.noneMatchAfter) || condition.noneMatchAfter < 0) {
         throw new HttpError(400, 'condition.noneMatchAfter must be a non-negative integer.');
     }
-    const selectorCandidate = condition.selector ?? condition.types;
-    if (selectorCandidate === undefined) {
-        throw new HttpError(400, 'condition.selector (or condition.types) is required.');
+    if (condition.selector === undefined) {
+        throw new HttpError(400, 'condition.selector is required.');
     }
-    const selector = parseSelector(selectorCandidate, condition.selector !== undefined ? 'condition.selector' : 'condition.types', true);
+    const selector = parseSelector(condition.selector, 'condition.selector', true);
     const matcher = parseMatcher(condition.matcher, 'condition.matcher', matcherCache);
     return new CommitCondition(
         selector,
@@ -171,9 +170,8 @@ function parseCondition(value, matcherCache = undefined) {
  * @returns {string} JSON string representation.
  */
 function serializeCondition(condition, matcher = null) {
-    const selector = condition.selector ?? condition.types;
     return JSON.stringify({
-        ...(selector !== undefined ? { selector } : {}),
+        selector: condition.selector,
         noneMatchAfter: condition.noneMatchAfter,
         ...(matcher ? { matcher } : {})
     });

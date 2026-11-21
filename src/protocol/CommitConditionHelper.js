@@ -10,11 +10,6 @@ function cloneValue(value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
-function validateTypes(types) {
-    assert(Array.isArray(types) && types.length > 0, 'types must be a non-empty array of strings.');
-    assert(types.every(type => typeof type === 'string' && type !== ''), 'types must be a non-empty array of strings.');
-}
-
 function validateSelector(selector) {
     if (typeof selector === 'string') {
         assert(selector !== '', 'selector stream names must not be empty.');
@@ -49,15 +44,8 @@ function validateMatcher(matcher) {
 
 function validateCommitCondition(condition) {
     assert(condition && typeof condition === 'object' && !Array.isArray(condition), 'condition must be a JSON object.');
-    const hasSelector = condition.selector !== undefined;
-    const hasTypes = condition.types !== undefined;
-    assert(hasSelector || hasTypes, 'condition must include selector or types.');
-    assert(!(hasSelector && hasTypes), 'condition must include either selector or types, not both.');
-    if (hasSelector) {
-        validateSelector(condition.selector);
-    } else {
-        validateTypes(condition.types);
-    }
+    assert(condition.selector !== undefined, 'condition must include a selector.');
+    validateSelector(condition.selector);
     validateNoneMatchAfter(condition.noneMatchAfter);
     validateMatcher(condition.matcher);
 }
@@ -168,12 +156,6 @@ class CommitConditionHelper {
         };
     }
 
-    types(types) {
-        validateTypes(types);
-        this.data.selector = [...types];
-        return this;
-    }
-
     selector(selector) {
         validateSelector(selector);
         this.data.selector = cloneValue(selector);
@@ -197,9 +179,8 @@ class CommitConditionHelper {
     }
 
     build() {
-        const selector = cloneValue(this.data.selector);
         const condition = {
-            ...(selector !== undefined ? { selector } : {}),
+            selector: cloneValue(this.data.selector),
             noneMatchAfter: this.data.noneMatchAfter,
             ...(this.data.matcher !== undefined ? { matcher: cloneValue(this.data.matcher) } : {})
         };

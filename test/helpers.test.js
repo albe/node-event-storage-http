@@ -48,7 +48,7 @@ test('CommitConditionHelper builds and round-trips header values', () => {
         .build();
 
     const condition = new CommitConditionHelper()
-        .types(['OrderPlaced'])
+        .selector(['types/OrderPlaced'])
         .noneMatchAfter(42)
         .matching(matcher)
         .build();
@@ -60,7 +60,7 @@ test('CommitConditionHelper builds and round-trips header values', () => {
 });
 
 test('CommitConditionHelper parses conditions from headers-like objects', () => {
-    const condition = CommitConditionHelper.create(['OrderPlaced'], 7, {
+    const condition = CommitConditionHelper.create(['types/OrderPlaced'], 7, {
         payload: { orderId: '1' }
     });
 
@@ -83,7 +83,7 @@ test('CommitConditionHelper matcher(...) alias behaves like matching(...)', () =
         .build();
 
     const condition = new CommitConditionHelper()
-        .types(['OrderPlaced'])
+        .selector(['types/OrderPlaced'])
         .noneMatchAfter(12)
         .matcher(matcher)
         .build();
@@ -93,9 +93,9 @@ test('CommitConditionHelper matcher(...) alias behaves like matching(...)', () =
 
 test('CommitConditionHelper selector(...) supports nested selector algebra', () => {
     const condition = new CommitConditionHelper()
-        .selector([['tags/featured', ['OrderPlaced', 'OrderConfirmed']]])
+        .selector([['tags/featured', ['types/OrderPlaced', 'types/OrderConfirmed']]])
         .noneMatchAfter(12)
         .build();
 
-    assert.deepEqual(condition.selector, [['tags/featured', ['OrderPlaced', 'OrderConfirmed']]]);
+    assert.deepEqual(condition.selector, [['tags/featured', ['types/OrderPlaced', 'types/OrderConfirmed']]]);
 });

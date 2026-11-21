@@ -115,7 +115,7 @@ class EventStoreHttpClient {
     }
 
     /**
-     * @param {string[]|object} selectorOrQuery Legacy types array or DCB query object.
+     * @param {string[]|object} selectorOrQuery Event types (resolved by the store) or a DCB query object.
      * @param {{from?: number, filter?: object|null, signal?: AbortSignal}} [options={}] Query options.
      * @returns {Promise<HttpEventStream>} NDJSON event stream.
      */

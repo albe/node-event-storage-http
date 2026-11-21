@@ -129,11 +129,8 @@ const matcher = new MatcherBuilder()
     .path('metadata.total').greaterThan(24)
     .build();
 
-const condition = stream.commitCondition ?? new CommitConditionHelper()
-    .types(['OrderPlaced'])
-    .noneMatchAfter(events.length)
-    .matcher(matcher)
-    .build();
+// The query response carries the commit condition: the store's stream names and position.
+const condition = stream.commitCondition;
 
 await fetch('http://127.0.0.1:3000/streams/orders-1/commit', {
     method: 'POST',
@@ -182,7 +179,7 @@ Query responses also expose a serialized optimistic-concurrency condition in the
 - Body (JSON object):
   - `events` (required): non-empty array of event payload objects.
   - `expectedVersion` (optional): integer, `"any"`, or `"empty"`.
-  - `condition` (optional): serialized DCB commit condition (`{ selector|types, noneMatchAfter, matcher? }`).
+  - `condition` (optional): serialized DCB commit condition (`{ selector, noneMatchAfter, matcher? }`), usually taken unchanged from the `x-event-store-query-condition` header of a query response.
   - `metadata` (optional): object merged into commit metadata for all events.
 
 ```json
@@ -272,7 +269,7 @@ GET /streams/join?selector=%5B%5B%22tags%2Ffeatured%22%2C%5B%22OrderPlaced%22%2C
 `GET /query[/from/{revision}]` returns NDJSON events for a selector plus optional matcher.
 
 - Query params (legacy):
-  - `types` (required unless `selector`/`query` is provided): comma-separated type/stream names.
+  - `types` (required unless `selector`/`query` is provided): comma-separated event types. Same as the DCB query `{ items: [{ types }] }`, so the store resolves them to its type streams (`types/<type>`); requires `typeAccessor`.
   - `filter` (optional): matcher JSON object.
 - Query params (selector algebra):
   - `selector`: URL-encoded JSON selector algebra.
@@ -314,6 +311,13 @@ Raw-mode matcher notes:
 - Function matchers in raw mode receive a raw document `Buffer`.
 - Raw object matchers require the default compact JSON serializer format.
 - String-encoded matchers are deserialized through a bounded LRU cache (`matcherCacheSize`, default `100`) so identical matcher JSON reuses the same in-memory object reference.
+
+## Upgrading to 1.5
+
+`event-storage` 1.5 names type streams `types/<type>` (see its upgrade guide). For the HTTP layer this means:
+
+- `GET /query?types=...` addresses event types, resolved by the store like a DCB query. A regular stream with the same name as a type is no longer read. Without `typeAccessor` the request fails with `400`.
+- The commit condition only has a `selector` with the store's stream names. The `types` field and `CommitConditionHelper#types()` are removed: a client can't know the store's stream names or position, so take the condition from the query response header. Name type streams as `types/<type>` in selectors for `/streams/join`, `selector=` and conditions.
 
 ## Benchmark snapshot (local loopback)
 
