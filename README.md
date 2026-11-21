@@ -148,6 +148,31 @@ await fetch('http://127.0.0.1:3000/streams/orders-1/commit', {
 });
 ```
 
+### Decision models and read models over HTTP
+
+`httpSource(client)` is the event source of `event-storage/projections` over this API (requires `event-storage` with event sources, 1.6 or later). Decision models and read models then work the same as against a local store:
+
+```js
+import { EventStoreHttpClient, httpSource } from 'event-storage-http/client';
+import { buildDecisionModel, createReadModel, transformEvents } from 'event-storage/projections';
+
+const client = new EventStoreHttpClient({ baseUrl: 'http://127.0.0.1:3000' });
+const source = httpSource(client);
+
+const model = await buildDecisionModel(source, { capacity: CourseCapacity(courseId), subscriptions: CourseSubscriptions(courseId) });
+if (model.state.subscriptions < model.state.capacity) {
+    await client.commit(`semester-${semesterId}`, [subscription], { condition: model.commitCondition });
+}
+
+const overview = createReadModel(source, CourseOverview);
+await overview.ready;
+```
+
+- Events are read through `GET /query`; their type and tags are read with the store's `typeAccessor` and `tagsAccessor`, which `GET /health` reports. Pass `{ typeAccessor, tagsAccessor }` to override them.
+- `follow()` (used by read models) asks for new events every `pollIntervalMs` (default 1000) while nothing new arrives.
+- Commit conditions are plain JSON over HTTP, so only object matchers are supported.
+- `transformEvents(source, transform)` from `event-storage/projections` changes events before projections see them, e.g. to decrypt fields on the client.
+
 ## Endpoints
 
 - `POST /streams/{stream}/commit`
@@ -171,7 +196,7 @@ Query responses also expose a serialized optimistic-concurrency condition in the
 
 `start` and `end` are accepted wherever a revision boundary is expected. Matchers are JSON object matchers using the same shape as the core storage matchers (`{ stream, payload, metadata }`). The HTTP layer reuses the canonical matcher implementation from `event-storage`.
 
-`GET /health` returns a small JSON snapshot for liveness and basic diagnostics. It includes whether the store appears open, whether it is currently writable, store length, stream/consumer counts, `event-storage` version (best effort), and selected runtime information from the Express/Node process.
+`GET /health` returns a small JSON snapshot for liveness and basic diagnostics. It includes whether the store appears open, whether it is currently writable, store length, stream/consumer counts, `event-storage` version (best effort), the `typeAccessor` and `tagsAccessor` paths (`store.accessors`), and selected runtime information from the Express/Node process.
 
 ### Stream endpoints
 

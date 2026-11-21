@@ -136,6 +136,23 @@ class EventStoreHttpClient {
     }
 
     /**
+     * Read the events of a compiled selector (nested stream algebra) from a global position, optionally filtered by
+     * an object matcher. The response carries the commit condition for the selection.
+     *
+     * @param {string|Array<string|any>} selector Selector, e.g. `condition.selector` of a commit condition.
+     * @param {{from?: number, filter?: object|null, signal?: AbortSignal}} [options={}] Read options.
+     * @returns {Promise<HttpEventStream>} NDJSON event stream.
+     */
+    async readSelector(selector, { from = 1, filter = null, signal } = {}) {
+        const queryParams = [`selector=${encodeURIComponent(JSON.stringify(selector))}`];
+        if (filter) {
+            queryParams.push(`filter=${encodeURIComponent(JSON.stringify(filter))}`);
+        }
+        const res = await this._request('GET', `/query/from/${from}?${queryParams.join('&')}`, { signal });
+        return new HttpEventStream(res);
+    }
+
+    /**
      * Continuously follow a source, yielding batches of events as they arrive.
      * Reconnects with a fixed backoff on transient errors; stops only when the
      * provided signal is aborted.

@@ -5,6 +5,7 @@
  */
 export { default as HttpEventStream } from './HttpEventStream.js';
 export { default as EventStoreHttpClient } from './EventStoreHttpClient.js';
+export { httpSource } from './httpSource.js';
 
 // Re-export protocol helpers commonly used alongside the client.
 export { CommitConditionHelper, MatcherBuilder, CONDITION_HEADER, eventPosition, commitPosition, NdjsonDecoder } from '../protocol/index.js';
