@@ -168,6 +168,12 @@ class EventStoreHttpClient {
                     position = source.kind === 'stream' ? position + 1 : eventPosition(event.metadata);
                     events.push(event);
                 }
+                if (events.length === 0) {
+                    // The server only answers a window without events when the whole window is already committed
+                    // (a window that reaches beyond the store waits for events and times out with 408 instead), so
+                    // nothing more can match in it.
+                    next = until + 1;
+                }
             } catch (err) {
                 if (signal?.aborted) {
                     throw err;
