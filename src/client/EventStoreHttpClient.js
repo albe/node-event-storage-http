@@ -140,35 +140,44 @@ class EventStoreHttpClient {
      * Reconnects with a fixed backoff on transient errors; stops only when the
      * provided signal is aborted.
      *
+     * Positions are in the coordinates of the source: stream revisions for a
+     * `stream` source, global positions for `category` and `join` sources.
+     * Each batch carries the position of its last event, so a follower resumes
+     * with `fromPosition: batch.position + 1`.
+     *
      * @param {FollowSource} source Resource descriptor.
-     * @param {{fromPosition?: number, windowSize?: number, signal?: AbortSignal}} [options={}] Follow options. `fromPosition` is the 1-based revision cursor to resume from.
+     * @param {{fromPosition?: number, windowSize?: number, signal?: AbortSignal}} [options={}] Follow options. `fromPosition` is the 1-based position of the first event to read.
      * @yields {{events: object[], position: number}}
      * @returns {AsyncGenerator<{events: object[], position: number}, void, undefined>}
      */
     async *follow(source, { fromPosition = 1, windowSize = 1_000_000, signal } = {}) {
-        let position = fromPosition;
+        let next = fromPosition;
 
         while (true) {
             if (signal?.aborted) {
                 return;
             }
-            const until = position + windowSize;
+            const until = next + windowSize - 1;
+            const events = [];
+            let position = next - 1;
             try {
-                const res = await this._request('GET', this._readPath(source, position, until), { signal });
-                const stream = new HttpEventStream(res);
-                const events = [];
-                for await (const event of stream) {
+                const res = await this._request('GET', this._readPath(source, next, until), { signal });
+                for await (const event of new HttpEventStream(res)) {
+                    // A stream read returns the contiguous revisions of the requested window, while category and
+                    // join reads are windows over the global log that only contain the matching events.
+                    position = source.kind === 'stream' ? position + 1 : eventPosition(event.metadata);
                     events.push(event);
-                    position = eventPosition(event);
-                }
-                if (events.length > 0) {
-                    yield { events, position };
                 }
             } catch (err) {
                 if (signal?.aborted) {
                     throw err;
                 }
                 await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            // Events received before a connection failed are still delivered, so they are not read twice.
+            if (events.length > 0) {
+                next = position + 1;
+                yield { events, position };
             }
         }
     }
