@@ -104,7 +104,7 @@ export class EventStoreHttpClient {
     readSelector(selector: StreamSelector, options?: QueryReadOptions): Promise<HttpEventStream>;
     follow(source: FollowSource, options?: FollowOptions): AsyncGenerator<FollowBatch, void, undefined>;
     commit(stream: string, events: object[], options?: CommitOptions): Promise<Record<string, unknown>>;
-    health(): Promise<Record<string, unknown>>;
+    health(options?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
 }
 
 /** One event as delivered by an event source. */
@@ -134,7 +134,7 @@ export interface HttpSourceOptions {
 
 /** The event source of `event-storage/projections` over the HTTP API. */
 export interface HttpEventSource {
-    query(query: Record<string, unknown>, options?: { from?: number }): Promise<{ events: AsyncIterable<SourceEnvelope>; condition: SerializedCommitCondition }>;
+    query(query: Record<string, unknown> | StreamSelector, options?: { from?: number }): Promise<{ events: AsyncIterable<SourceEnvelope>; condition: SerializedCommitCondition }>;
     read(selection: SourceSelection, options?: { from?: number; signal?: AbortSignal }): AsyncIterable<SourceEnvelope>;
     follow(selection: SourceSelection, options?: { from?: number; signal?: AbortSignal }): AsyncIterable<SourceEnvelope>;
 }

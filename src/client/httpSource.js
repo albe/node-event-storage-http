@@ -42,16 +42,17 @@ function sleep(ms, signal) {
 function httpSource(client, { typeAccessor, tagsAccessor, pollIntervalMs = 1000 } = {}) {
     let accessors = null;
 
-    const loadAccessors = async () => {
+    const loadAccessors = async (signal) => {
         if (accessors) {
             return accessors;
         }
         let type = typeAccessor;
         let tags = tagsAccessor;
         if (type === undefined || tags === undefined) {
-            const health = await client.health();
-            type ??= health.store?.accessors?.type ?? null;
-            tags ??= health.store?.accessors?.tags ?? null;
+            const reported = (await client.health({ signal })).store?.accessors ?? {};
+            // null is an explicit opt-out, only fill in what was not passed.
+            if (type === undefined) type = reported.type ?? null;
+            if (tags === undefined) tags = reported.tags ?? null;
         }
         if (!type) {
             throw new Error('httpSource() needs the typeAccessor of the store. Configure it on the server or pass { typeAccessor }.');
@@ -65,9 +66,10 @@ function httpSource(client, { typeAccessor, tagsAccessor, pollIntervalMs = 1000 
      * @param {AsyncIterable<{ payload: object, metadata: object }>} documents
      * @param {number} from Skip events before this position.
      * @param {number} [until] Stop after this position.
+     * @param {AbortSignal} [signal] Cancels the accessor discovery.
      */
-    const envelopes = async function* (documents, from, until = Infinity) {
-        const { typeOf, tagsOf } = await loadAccessors();
+    const envelopes = async function* (documents, from, until = Infinity, signal = undefined) {
+        const { typeOf, tagsOf } = await loadAccessors(signal);
         for await (const { payload, metadata } of documents) {
             const position = eventPosition(metadata);
             if (position < from) continue;
@@ -99,7 +101,8 @@ function httpSource(client, { typeAccessor, tagsAccessor, pollIntervalMs = 1000 
         },
 
         async *read(selection, { from = 1, signal } = {}) {
-            yield* envelopes(await request(selection, { from, signal }), from);
+            await loadAccessors(signal);
+            yield* envelopes(await request(selection, { from, signal }), from, Infinity, signal);
         },
 
         async *follow(selection, { from = 1, signal } = {}) {
@@ -107,8 +110,9 @@ function httpSource(client, { typeAccessor, tagsAccessor, pollIntervalMs = 1000 
             while (!signal?.aborted) {
                 let received = false;
                 try {
+                    await loadAccessors(signal);
                     const stream = await request(selection, { from: next, signal });
-                    for await (const envelope of envelopes(stream, next)) {
+                    for await (const envelope of envelopes(stream, next, Infinity, signal)) {
                         next = envelope.position + 1;
                         received = true;
                         yield envelope;

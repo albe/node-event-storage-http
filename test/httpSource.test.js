@@ -131,6 +131,35 @@ test('httpSource.follow delivers new events until aborted', async () => {
     }
 });
 
+test('httpSource keeps a null tagsAccessor as an opt-out', async () => {
+    const fixture = await createFixture();
+    try {
+        const { client } = fixture;
+        await client.commit('courses', [course('c1', 2)]);
+        const { events } = await httpSource(client, { tagsAccessor: null }).query({ items: [{ types: ['CourseDefined'] }] });
+        assert.deepEqual((await collect(events)).map(e => [e.type, e.tags]), [['CourseDefined', []]]);
+    } finally {
+        await fixture.close();
+    }
+});
+
+test('httpSource cancels the accessor discovery with the signal', async () => {
+    let healthSignal;
+    const client = {
+        health: ({ signal }) => new Promise((resolve, reject) => {
+            healthSignal = signal;
+            signal.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+        readSelector: async () => { throw new Error('not reached'); }
+    };
+    const abort = new AbortController();
+    const reading = httpSource(client).read({ selector: ['_all'] }, { signal: abort.signal }).next();
+    await new Promise(resolve => setImmediate(resolve));
+    abort.abort();
+    await assert.rejects(reading, /aborted/);
+    assert.equal(healthSignal, abort.signal);
+});
+
 test('httpSource uses explicit accessors and requires a type accessor', async () => {
     const fixture = await createFixture({ typeAccessor: undefined, tagsAccessor: undefined, streamSources: [{ path: 'kind', nameBuilder: v => `kind/${v}` }] });
     try {

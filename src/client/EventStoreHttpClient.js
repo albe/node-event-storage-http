@@ -225,10 +225,11 @@ class EventStoreHttpClient {
     }
 
     /**
+     * @param {{signal?: AbortSignal}} [options={}] Request options.
      * @returns {Promise<object>} Server health payload.
      */
-    async health() {
-        const res = await this._request('GET', '/health');
+    async health({ signal } = {}) {
+        const res = await this._request('GET', '/health', { signal });
         return res.json();
     }
 }
