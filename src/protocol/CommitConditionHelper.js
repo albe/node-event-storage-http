@@ -10,6 +10,11 @@ function cloneValue(value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
+function validateTypes(types) {
+    assert(Array.isArray(types) && types.length > 0, 'types must be a non-empty array of strings.');
+    assert(types.every(type => typeof type === 'string' && type !== ''), 'types must be a non-empty array of strings.');
+}
+
 function validateSelector(selector) {
     if (typeof selector === 'string') {
         assert(selector !== '', 'selector stream names must not be empty.');
@@ -44,8 +49,15 @@ function validateMatcher(matcher) {
 
 function validateCommitCondition(condition) {
     assert(condition && typeof condition === 'object' && !Array.isArray(condition), 'condition must be a JSON object.');
-    assert(condition.selector !== undefined, 'condition must include a selector.');
-    validateSelector(condition.selector);
+    const hasSelector = condition.selector !== undefined;
+    const hasTypes = condition.types !== undefined;
+    assert(hasSelector || hasTypes, 'condition must include selector or types.');
+    assert(!(hasSelector && hasTypes), 'condition must include either selector or types, not both.');
+    if (hasSelector) {
+        validateSelector(condition.selector);
+    } else {
+        validateTypes(condition.types);
+    }
     validateNoneMatchAfter(condition.noneMatchAfter);
     validateMatcher(condition.matcher);
 }
@@ -122,6 +134,11 @@ class MatcherBuilder {
         return this.setOperator('$hasAny', values.length === 1 && Array.isArray(values[0]) ? values[0] : values);
     }
 
+    startsWith(prefix) {
+        assert(typeof prefix === 'string' && prefix !== '', 'startsWith(...) requires a non-empty string prefix.');
+        return this.setOperator('$startsWith', prefix);
+    }
+
     setValue(value) {
         assert(this.currentSegments, 'call path(...) before adding matcher operations.');
         const { node, key } = getOrCreatePath(this.matcher, this.currentSegments);
@@ -156,6 +173,12 @@ class CommitConditionHelper {
         };
     }
 
+    types(types) {
+        validateTypes(types);
+        this.data.selector = [...types];
+        return this;
+    }
+
     selector(selector) {
         validateSelector(selector);
         this.data.selector = cloneValue(selector);
@@ -179,8 +202,9 @@ class CommitConditionHelper {
     }
 
     build() {
+        const selector = cloneValue(this.data.selector);
         const condition = {
-            selector: cloneValue(this.data.selector),
+            ...(selector !== undefined ? { selector } : {}),
             noneMatchAfter: this.data.noneMatchAfter,
             ...(this.data.matcher !== undefined ? { matcher: cloneValue(this.data.matcher) } : {})
         };

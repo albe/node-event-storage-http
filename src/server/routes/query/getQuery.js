@@ -34,7 +34,7 @@ function registerGetQueryRoute(app, { eventStore, matcherCache } = {}) {
 
     /**
      * @param {import('express').Request} request
-     * @returns {string|Array<unknown>|object} Selector algebra or a DCB query.
+     * @returns {string|string[]}
      */
     const parseSelectorInput = (request) => {
         const dcbQuery = parseDcbQueryShorthand(request);
@@ -50,12 +50,11 @@ function registerGetQueryRoute(app, { eventStore, matcherCache } = {}) {
             return parseSelector(selectorInput, 'selector', true);
         }
 
-        const types = getQueryValues(request.query.types).map(type => parseStreamName(type, 'types'));
+        const types = getQueryValues(request.query.types).map(type => parseStreamName(type, 'types', true));
         if (types.length === 0) {
             throw new HttpError(400, 'types, selector, or query parameter is required.');
         }
-        // Event types are resolved to their type streams by the store, which owns the naming.
-        return { items: [{ types }] };
+        return types;
     };
 
     /**

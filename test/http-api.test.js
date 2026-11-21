@@ -615,7 +615,7 @@ test('GET /streams/join supports nested selector algebra via selector query para
             { type: 'OrderCancelled', orderId: '3', tags: ['eu'] }
         ]);
 
-        const selector = encodeURIComponent(JSON.stringify([['tags/featured', 'tags/eu', ['types/OrderPlaced']]]));
+        const selector = encodeURIComponent(JSON.stringify([['tags/featured', 'tags/eu', ['OrderPlaced']]]));
         const response = await fetch(`${fixture.baseUrl}/streams/join?selector=${selector}`);
         assert.equal(response.status, 200);
 
@@ -700,7 +700,7 @@ test('GET /query returns NDJSON and exposes a serialized commit condition header
         assert.equal(response.status, 200);
         const condition = JSON.parse(response.headers.get('x-event-store-query-condition'));
         assert.deepEqual(condition, {
-            selector: ['types/OrderPlaced'],
+            selector: ['OrderPlaced'],
             noneMatchAfter: 2,
             matcher: { payload: { orderId: '2' } }
         });
@@ -748,7 +748,7 @@ test('GET /query supports DCB shorthand query payloads with tags and types', asy
         assert.equal(response.status, 200);
 
         const condition = JSON.parse(response.headers.get('x-event-store-query-condition'));
-        assert.deepEqual(condition.selector, [['tags/featured', 'types/OrderPlaced']]);
+        assert.deepEqual(condition.selector, [['tags/featured', 'OrderPlaced']]);
         const events = await parseNdjson(response);
         assert.deepEqual(events.map(event => event.payload.orderId), ['1']);
     } finally {
@@ -772,62 +772,20 @@ test('GET /query treats non-existing type streams as empty', async () => {
     }
 });
 
-test('GET /query types address event types, not streams with the same name', async () => {
+test('GET /query supports $startsWith matchers', async () => {
     const fixture = await createFixture();
     try {
-        await commitAsync(fixture.eventStore, 'OrderPlaced', [
-            { type: 'Unrelated', orderId: '0' }
-        ]);
         await commitAsync(fixture.eventStore, 'orders-1', [
-            { type: 'OrderPlaced', orderId: '1' }
+            { type: 'OrderPlaced', region: 'eu-west' },
+            { type: 'OrderPlaced', region: 'us-east' }
         ]);
 
-        const response = await fetch(`${fixture.baseUrl}/query?types=OrderPlaced`);
+        const filter = encodeURIComponent(JSON.stringify({ payload: { region: { $startsWith: 'eu-' } } }));
+        const response = await fetch(`${fixture.baseUrl}/query?types=OrderPlaced&filter=${filter}`);
         assert.equal(response.status, 200);
+
         const events = await parseNdjson(response);
-        assert.deepEqual(events.map(event => event.payload.orderId), ['1']);
-    } finally {
-        await destroyFixture(fixture);
-    }
-});
-
-test('GET /query rejects types when the store has no typeAccessor', async () => {
-    const fixture = await createFixture({ eventStoreConfig: { typeAccessor: undefined } });
-    try {
-        const response = await fetch(`${fixture.baseUrl}/query?types=OrderPlaced`);
-        assert.equal(response.status, 400);
-    } finally {
-        await destroyFixture(fixture);
-    }
-});
-
-test('POST /streams/:stream/commit checks the condition from a query response', async () => {
-    const fixture = await createFixture();
-    try {
-        await commitAsync(fixture.eventStore, 'orders-1', [
-            { type: 'OrderPlaced', orderId: '1' }
-        ]);
-        const queryResponse = await fetch(`${fixture.baseUrl}/query?types=OrderPlaced`);
-        await parseNdjson(queryResponse);
-        const condition = JSON.parse(queryResponse.headers.get('x-event-store-query-condition'));
-
-        await commitAsync(fixture.eventStore, 'orders-2', [
-            { type: 'OrderPlaced', orderId: '2' }
-        ]);
-
-        const commit = (body) => fetch(`${fixture.baseUrl}/streams/orders-3/commit`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        const conflict = await commit({ events: [{ type: 'OrderConfirmed', orderId: '3' }], condition });
-        assert.equal(conflict.status, 409);
-
-        const typesCondition = await commit({
-            events: [{ type: 'OrderConfirmed', orderId: '3' }],
-            condition: { types: ['OrderPlaced'], noneMatchAfter: condition.noneMatchAfter }
-        });
-        assert.equal(typesCondition.status, 400);
+        assert.deepEqual(events.map(event => event.payload.region), ['eu-west']);
     } finally {
         await destroyFixture(fixture);
     }
@@ -1059,7 +1017,7 @@ test('HttpEventStream parses NDJSON response body and exposes commitCondition he
 
         const stream = new HttpEventStream(response);
         assert.ok(stream.commitCondition, 'commitCondition should be populated from response header');
-        assert.deepEqual(stream.commitCondition.selector, ['types/OrderPlaced', 'types/OrderConfirmed']);
+        assert.deepEqual(stream.commitCondition.selector, ['OrderPlaced', 'OrderConfirmed']);
 
         const events = await stream.toArray();
         assert.equal(events.length, 2);

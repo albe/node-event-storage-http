@@ -35,7 +35,7 @@ function mapErrorStatus(error) {
     if (/already exists|already closed|is closed|Can not recreate stream|read-only mode|Optimistic concurrency error/.test(error.message)) {
         return 409;
     }
-    if (/Must specify|Must provide|Invalid|No events specified|Specify either|not configured/.test(error.message)) {
+    if (/Must specify|Must provide|Invalid|No events specified|Specify either/.test(error.message)) {
         return 400;
     }
     return 500;
