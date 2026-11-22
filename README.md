@@ -96,6 +96,28 @@ for await (const event of stream) {
 await client.commit('orders-1', [{ type: 'OrderConfirmed', orderId: 'order-1' }]);
 ```
 
+### Following a source
+
+`client.follow(source, { fromPosition, windowSize, signal })` keeps reading a source and yields each new batch of events as `{ events, position }`. It long-polls the server while nothing new arrives and retries after connection errors. Leave the loop with `break`, or abort `signal`: a pending request then rejects with the abort error.
+
+- `source` is `{ kind: 'stream', name }`, `{ kind: 'category', name }`, or `{ kind: 'join', streams }` / `{ kind: 'join', selector }`.
+- Positions are global positions for every kind of source; a stream is read as a join of that one stream.
+- `position` is the position of the last event in the batch. Store it and resume with `fromPosition: position + 1`.
+- `fromPosition` (default `1`) is the global position of the first event to read, `windowSize` (default `1_000_000`) the number of positions requested per call.
+
+```js
+const abort = new AbortController();
+let position = loadCheckpoint() ?? 0;
+
+for await (const batch of client.follow({ kind: 'stream', name: 'orders-1' }, { fromPosition: position + 1, signal: abort.signal })) {
+    for (const { payload, metadata } of batch.events) {
+        handle(payload, metadata);
+    }
+    position = batch.position;
+    saveCheckpoint(position);
+}
+```
+
 To attach the API onto an Express app you already own:
 
 ```js

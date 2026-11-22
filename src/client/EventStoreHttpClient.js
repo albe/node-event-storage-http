@@ -140,35 +140,50 @@ class EventStoreHttpClient {
      * Reconnects with a fixed backoff on transient errors; stops only when the
      * provided signal is aborted.
      *
+     * Positions are global positions for every kind of source: a `stream`
+     * source is read as a join of that one stream. Each batch carries the
+     * position of its last event, so a follower resumes with
+     * `fromPosition: batch.position + 1`.
+     *
      * @param {FollowSource} source Resource descriptor.
-     * @param {{fromPosition?: number, windowSize?: number, signal?: AbortSignal}} [options={}] Follow options. `fromPosition` is the 1-based revision cursor to resume from.
+     * @param {{fromPosition?: number, windowSize?: number, signal?: AbortSignal}} [options={}] Follow options. `fromPosition` is the global position of the first event to read.
      * @yields {{events: object[], position: number}}
      * @returns {AsyncGenerator<{events: object[], position: number}, void, undefined>}
      */
     async *follow(source, { fromPosition = 1, windowSize = 1_000_000, signal } = {}) {
-        let position = fromPosition;
+        // Reading a single stream as a join keeps every source in global positions.
+        const readSource = source.kind === 'stream' ? { kind: 'join', streams: [source.name] } : source;
+        let next = fromPosition;
 
         while (true) {
             if (signal?.aborted) {
                 return;
             }
-            const until = position + windowSize;
+            const until = next + windowSize - 1;
+            const events = [];
+            let position = next - 1;
             try {
-                const res = await this._request('GET', this._readPath(source, position, until), { signal });
-                const stream = new HttpEventStream(res);
-                const events = [];
-                for await (const event of stream) {
+                const res = await this._request('GET', this._readPath(readSource, next, until), { signal });
+                for await (const event of new HttpEventStream(res)) {
+                    position = eventPosition(event.metadata);
                     events.push(event);
-                    position = eventPosition(event);
                 }
-                if (events.length > 0) {
-                    yield { events, position };
+                if (events.length === 0) {
+                    // The server only answers a window without events when the whole window is already committed
+                    // (a window that reaches beyond the store waits for events and times out with 408 instead), so
+                    // nothing more can match in it.
+                    next = until + 1;
                 }
             } catch (err) {
                 if (signal?.aborted) {
                     throw err;
                 }
                 await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            // Events received before a connection failed are still delivered, so they are not read twice.
+            if (events.length > 0) {
+                next = position + 1;
+                yield { events, position };
             }
         }
     }

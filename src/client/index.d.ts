@@ -72,6 +72,7 @@ export interface QueryReadOptions {
 }
 
 export interface FollowOptions {
+    /** Global position of the first event to read. A `stream` source is followed as a join of that stream. */
     fromPosition?: number;
     windowSize?: number;
     signal?: AbortSignal;
@@ -85,6 +86,7 @@ export interface CommitOptions {
 
 export interface FollowBatch {
     events: Record<string, unknown>[];
+    /** Position of the last event in the batch. Resume with `fromPosition: position + 1`. */
     position: number;
 }
 

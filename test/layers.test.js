@@ -146,6 +146,75 @@ test('client.follow yields a batch then stops cleanly on break', async () => {
     }
 });
 
+test('client.follow reports global positions for a stream and resumes after them', async () => {
+    const fixture = await createFixture();
+    try {
+        const client = new EventStoreHttpClient({ baseUrl: fixture.baseUrl });
+        await client.commit('inventory', [{ type: 'ItemAdded', sku: 'a' }, { type: 'ItemAdded', sku: 'b' }]);
+        await client.commit('orders', [{ type: 'OrderPlaced' }]);
+
+        const batches = [];
+        for await (const batch of client.follow({ kind: 'stream', name: 'inventory' })) {
+            batches.push(batch);
+            if (batches.length === 1) {
+                await client.commit('inventory', [{ type: 'ItemAdded', sku: 'c' }]);
+            } else {
+                break;
+            }
+        }
+        assert.deepEqual(batches.map(batch => batch.position), [2, 4]);
+        assert.deepEqual(batches.map(batch => batch.events.map(event => event.payload.sku)), [['a', 'b'], ['c']]);
+    } finally {
+        await fixture.close();
+    }
+});
+
+test('client.follow reports global positions for a join and continues after them', async () => {
+    const fixture = await createFixture();
+    try {
+        const client = new EventStoreHttpClient({ baseUrl: fixture.baseUrl });
+        await client.commit('inventory', [{ type: 'ItemAdded', sku: 'a' }]);
+        await client.commit('orders', [{ type: 'OrderPlaced' }]);
+        await client.commit('inventory', [{ type: 'ItemAdded', sku: 'b' }]);
+
+        const batches = [];
+        for await (const batch of client.follow({ kind: 'join', streams: ['inventory'] }, { fromPosition: 2 })) {
+            batches.push(batch);
+            if (batches.length === 1) {
+                await client.commit('orders', [{ type: 'OrderPlaced' }]);
+                await client.commit('inventory', [{ type: 'ItemAdded', sku: 'c' }]);
+            } else {
+                break;
+            }
+        }
+        assert.deepEqual(batches.map(batch => batch.position), [3, 5]);
+        assert.deepEqual(batches.map(batch => batch.events.map(event => event.payload.sku)), [['b'], ['c']]);
+    } finally {
+        await fixture.close();
+    }
+});
+
+test('client.follow moves past a committed window without matching events', async () => {
+    const fixture = await createFixture();
+    try {
+        const client = new EventStoreHttpClient({ baseUrl: fixture.baseUrl });
+        await client.commit('inventory', [{ type: 'ItemAdded', sku: 'a' }]);
+        await client.commit('orders', [{ type: 'OrderPlaced' }]);
+        await client.commit('inventory', [{ type: 'ItemAdded', sku: 'b' }]);
+
+        const batches = [];
+        for await (const batch of client.follow({ kind: 'join', streams: ['inventory'] }, { windowSize: 1 })) {
+            batches.push(batch);
+            if (batches.length === 2) {
+                break;
+            }
+        }
+        assert.deepEqual(batches.map(batch => batch.position), [1, 3]);
+    } finally {
+        await fixture.close();
+    }
+});
+
 function fakeStore() {
     // Minimal stand-in for EventStore for constructor-only assertions: it never
     // emits 'ready', but `createApp`/`attach` only need scanConsumers to exist.
