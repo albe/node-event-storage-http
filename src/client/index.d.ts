@@ -99,9 +99,8 @@ export class EventStoreHttpClient {
     readStream(name: string, options?: ReadOptions): Promise<HttpEventStream>;
     readCategory(name: string, options?: ReadOptions): Promise<HttpEventStream>;
     readJoin(selectorOrStreams: StreamSelector, options?: ReadOptions): Promise<HttpEventStream>;
-    readQuery(selectorOrQuery: string[] | Record<string, unknown>, options?: QueryReadOptions): Promise<HttpEventStream>;
+    readQuery(selectorOrQuery: string[] | { selector: StreamSelector } | Record<string, unknown>, options?: QueryReadOptions): Promise<HttpEventStream>;
     /** Read the events of a compiled selector from a global position; the response carries the commit condition. */
-    readSelector(selector: StreamSelector, options?: QueryReadOptions): Promise<HttpEventStream>;
     follow(source: FollowSource, options?: FollowOptions): AsyncGenerator<FollowBatch, void, undefined>;
     commit(stream: string, events: object[], options?: CommitOptions): Promise<Record<string, unknown>>;
     health(options?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;

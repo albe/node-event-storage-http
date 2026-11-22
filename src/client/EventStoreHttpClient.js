@@ -115,7 +115,11 @@ class EventStoreHttpClient {
     }
 
     /**
-     * @param {string[]|object} selectorOrQuery Legacy types array or DCB query object.
+     * Query events from a global position. The selection is a types array, a DCB query object or `{ selector }` with
+     * a compiled selector (nested stream algebra), e.g. the `selector` of a commit condition. The response carries
+     * the commit condition for the selection.
+     *
+     * @param {string[]|{selector: string|Array<string|any>}|object} selectorOrQuery Types array, `{ selector }` or DCB query object.
      * @param {{from?: number, filter?: object|null, signal?: AbortSignal}} [options={}] Query options.
      * @returns {Promise<HttpEventStream>} NDJSON event stream.
      */
@@ -123,6 +127,8 @@ class EventStoreHttpClient {
         const queryParams = [];
         if (Array.isArray(selectorOrQuery)) {
             queryParams.push(`types=${selectorOrQuery.map(type => encodeURIComponent(type)).join(',')}`);
+        } else if (selectorOrQuery.selector !== undefined) {
+            queryParams.push(`selector=${encodeURIComponent(JSON.stringify(selectorOrQuery.selector))}`);
         } else {
             queryParams.push(`query=${encodeURIComponent(JSON.stringify(selectorOrQuery))}`);
         }
@@ -132,23 +138,6 @@ class EventStoreHttpClient {
         const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
         const fromPath = from !== undefined ? `/from/${from}` : '';
         const res = await this._request('GET', `/query${fromPath}${queryString}`, { signal });
-        return new HttpEventStream(res);
-    }
-
-    /**
-     * Read the events of a compiled selector (nested stream algebra) from a global position, optionally filtered by
-     * an object matcher. The response carries the commit condition for the selection.
-     *
-     * @param {string|Array<string|any>} selector Selector, e.g. `condition.selector` of a commit condition.
-     * @param {{from?: number, filter?: object|null, signal?: AbortSignal}} [options={}] Read options.
-     * @returns {Promise<HttpEventStream>} NDJSON event stream.
-     */
-    async readSelector(selector, { from = 1, filter = null, signal } = {}) {
-        const queryParams = [`selector=${encodeURIComponent(JSON.stringify(selector))}`];
-        if (filter) {
-            queryParams.push(`filter=${encodeURIComponent(JSON.stringify(filter))}`);
-        }
-        const res = await this._request('GET', `/query/from/${from}?${queryParams.join('&')}`, { signal });
         return new HttpEventStream(res);
     }
 

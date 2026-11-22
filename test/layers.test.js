@@ -127,6 +127,23 @@ test('client.readQuery supports DCB shorthand query objects', async () => {
     }
 });
 
+test('client.readQuery reads the selector of a commit condition', async () => {
+    const fixture = await createFixture();
+    try {
+        const client = new EventStoreHttpClient({ baseUrl: fixture.baseUrl });
+        await client.commit('orders-1', [{ type: 'OrderPlaced', orderId: '1' }]);
+        await client.commit('orders-2', [{ type: 'OrderPlaced', orderId: '2' }]);
+        await client.commit('orders-1', [{ type: 'OrderShipped', orderId: '1' }]);
+
+        const stream = await client.readQuery({ selector: ['orders-1'] }, { from: 2 });
+        const events = await stream.toArray();
+        assert.deepEqual(events.map(event => event.payload.type), ['OrderShipped']);
+        assert.ok(stream.commitCondition, 'the response carries the commit condition');
+    } finally {
+        await fixture.close();
+    }
+});
+
 test('client.follow yields a batch then stops cleanly on break', async () => {
     const fixture = await createFixture();
     try {

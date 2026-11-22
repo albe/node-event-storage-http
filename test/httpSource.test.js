@@ -150,7 +150,7 @@ test('httpSource cancels the accessor discovery with the signal', async () => {
             healthSignal = signal;
             signal.addEventListener('abort', () => reject(new Error('aborted')));
         }),
-        readSelector: async () => { throw new Error('not reached'); }
+        readQuery: async () => { throw new Error('not reached'); }
     };
     const abort = new AbortController();
     const reading = httpSource(client).read({ selector: ['_all'] }, { signal: abort.signal }).next();

@@ -86,7 +86,7 @@ function httpSource(client, { typeAccessor, tagsAccessor, pollIntervalMs = 1000 
         if (typeof selection.matcher === 'function') {
             throw new TypeError('httpSource() can only send object matchers to the server, not functions.');
         }
-        return client.readSelector(selection.selector, { from, filter: selection.matcher ?? null, signal });
+        return client.readQuery({ selector: selection.selector }, { from, filter: selection.matcher ?? null, signal });
     };
 
     return Object.freeze({
