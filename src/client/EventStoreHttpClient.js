@@ -115,7 +115,11 @@ class EventStoreHttpClient {
     }
 
     /**
-     * @param {string[]|object} selectorOrQuery Legacy types array or DCB query object.
+     * Query events from a global position. The selection is a types array, a DCB query object or `{ selector }` with
+     * a compiled selector (nested stream algebra), e.g. the `selector` of a commit condition. The response carries
+     * the commit condition for the selection.
+     *
+     * @param {string[]|{selector: string|Array<string|any>}|object} selectorOrQuery Types array, `{ selector }` or DCB query object.
      * @param {{from?: number, filter?: object|null, signal?: AbortSignal}} [options={}] Query options.
      * @returns {Promise<HttpEventStream>} NDJSON event stream.
      */
@@ -123,6 +127,8 @@ class EventStoreHttpClient {
         const queryParams = [];
         if (Array.isArray(selectorOrQuery)) {
             queryParams.push(`types=${selectorOrQuery.map(type => encodeURIComponent(type)).join(',')}`);
+        } else if (selectorOrQuery.selector !== undefined) {
+            queryParams.push(`selector=${encodeURIComponent(JSON.stringify(selectorOrQuery.selector))}`);
         } else {
             queryParams.push(`query=${encodeURIComponent(JSON.stringify(selectorOrQuery))}`);
         }
@@ -208,10 +214,11 @@ class EventStoreHttpClient {
     }
 
     /**
+     * @param {{signal?: AbortSignal}} [options={}] Request options.
      * @returns {Promise<object>} Server health payload.
      */
-    async health() {
-        const res = await this._request('GET', '/health');
+    async health({ signal } = {}) {
+        const res = await this._request('GET', '/health', { signal });
         return res.json();
     }
 }

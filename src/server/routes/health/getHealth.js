@@ -54,7 +54,11 @@ function registerGetHealthRoute(app, { eventStore } = {}) {
                 length: eventStore.length,
                 streams: streamCount,
                 consumers: consumerCount,
-                eventStorageVersion: getEventStorageVersion(eventStore)
+                eventStorageVersion: getEventStorageVersion(eventStore),
+                accessors: {
+                    type: eventStore.typeSource?.path ?? null,
+                    tags: eventStore.tagsSource?.path ?? null
+                }
             },
             server: {
                 env: request.app.get('env'),

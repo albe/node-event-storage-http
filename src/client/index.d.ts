@@ -99,8 +99,44 @@ export class EventStoreHttpClient {
     readStream(name: string, options?: ReadOptions): Promise<HttpEventStream>;
     readCategory(name: string, options?: ReadOptions): Promise<HttpEventStream>;
     readJoin(selectorOrStreams: StreamSelector, options?: ReadOptions): Promise<HttpEventStream>;
-    readQuery(selectorOrQuery: string[] | Record<string, unknown>, options?: QueryReadOptions): Promise<HttpEventStream>;
+    readQuery(selectorOrQuery: string[] | { selector: StreamSelector } | Record<string, unknown>, options?: QueryReadOptions): Promise<HttpEventStream>;
+    /** Read the events of a compiled selector from a global position; the response carries the commit condition. */
     follow(source: FollowSource, options?: FollowOptions): AsyncGenerator<FollowBatch, void, undefined>;
     commit(stream: string, events: object[], options?: CommitOptions): Promise<Record<string, unknown>>;
-    health(): Promise<Record<string, unknown>>;
+    health(options?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
 }
+
+/** One event as delivered by an event source. */
+export interface SourceEnvelope {
+    event: Record<string, unknown>;
+    metadata: Record<string, unknown>;
+    /** Global position of the event. */
+    position: number;
+    type: string;
+    tags: string[];
+}
+
+/** The events to read: a selector and an optional object matcher, e.g. a commit condition. */
+export interface SourceSelection {
+    selector: StreamSelector;
+    matcher?: Record<string, unknown> | null;
+}
+
+export interface HttpSourceOptions {
+    /** Dot-notation path to the event type. Default: reported by the server in `GET /health`. */
+    typeAccessor?: string;
+    /** Dot-notation path to the event tags. Default: reported by the server in `GET /health`. */
+    tagsAccessor?: string | null;
+    /** How long `follow()` waits before asking again when nothing new arrived. Default 1000. */
+    pollIntervalMs?: number;
+}
+
+/** The event source of `event-storage/projections` over the HTTP API. */
+export interface HttpEventSource {
+    query(query: Record<string, unknown> | StreamSelector, options?: { from?: number }): Promise<{ events: AsyncIterable<SourceEnvelope>; condition: SerializedCommitCondition }>;
+    read(selection: SourceSelection, options?: { from?: number; signal?: AbortSignal }): AsyncIterable<SourceEnvelope>;
+    follow(selection: SourceSelection, options?: { from?: number; signal?: AbortSignal }): AsyncIterable<SourceEnvelope>;
+}
+
+/** An event source for `buildDecisionModel()` and `createReadModel()` of `event-storage/projections`. */
+export function httpSource(client: EventStoreHttpClient, options?: HttpSourceOptions): HttpEventSource;
