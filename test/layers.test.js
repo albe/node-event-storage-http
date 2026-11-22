@@ -146,7 +146,7 @@ test('client.follow yields a batch then stops cleanly on break', async () => {
     }
 });
 
-test('client.follow resumes a stream after the last delivered revision', async () => {
+test('client.follow reports global positions for a stream and resumes after them', async () => {
     const fixture = await createFixture();
     try {
         const client = new EventStoreHttpClient({ baseUrl: fixture.baseUrl });
@@ -162,7 +162,7 @@ test('client.follow resumes a stream after the last delivered revision', async (
                 break;
             }
         }
-        assert.deepEqual(batches.map(batch => batch.position), [2, 3]);
+        assert.deepEqual(batches.map(batch => batch.position), [2, 4]);
         assert.deepEqual(batches.map(batch => batch.events.map(event => event.payload.sku)), [['a', 'b'], ['c']]);
     } finally {
         await fixture.close();

@@ -72,7 +72,7 @@ export interface QueryReadOptions {
 }
 
 export interface FollowOptions {
-    /** 1-based position of the first event to read: a stream revision for `stream` sources, a global position otherwise. */
+    /** Global position of the first event to read. A `stream` source is followed as a join of that stream. */
     fromPosition?: number;
     windowSize?: number;
     signal?: AbortSignal;
