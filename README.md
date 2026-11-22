@@ -98,7 +98,7 @@ await client.commit('orders-1', [{ type: 'OrderConfirmed', orderId: 'order-1' }]
 
 ### Following a source
 
-`client.follow(source, { fromPosition, windowSize, signal })` keeps reading a source and yields each new batch of events as `{ events, position }`. It long-polls the server while nothing new arrives, retries after connection errors, and ends when `signal` is aborted or the loop is left with `break`.
+`client.follow(source, { fromPosition, windowSize, signal })` keeps reading a source and yields each new batch of events as `{ events, position }`. It long-polls the server while nothing new arrives and retries after connection errors. Leave the loop with `break`, or abort `signal`: a pending request then rejects with the abort error.
 
 - `source` is `{ kind: 'stream', name }`, `{ kind: 'category', name }`, or `{ kind: 'join', streams }` / `{ kind: 'join', selector }`.
 - Positions are global positions for every kind of source; a stream is read as a join of that one stream.
