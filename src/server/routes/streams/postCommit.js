@@ -1,5 +1,8 @@
 import { HttpError, sendJson } from '../../http/errors.js';
-import { commitAsync, parseCondition, parseExpectedVersion, parseStreamName } from '../../http/routeUtils.js';
+import { hasPreference, parseCondition, parseExpectedVersion, parseStreamName } from '../../http/routeUtils.js';
+import { commitPosition, POSITION_HEADER } from '../../../protocol/index.js';
+
+const RESPOND_FLUSHED = 'respond-flushed';
 
 /**
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
@@ -9,6 +12,9 @@ import { commitAsync, parseCondition, parseExpectedVersion, parseStreamName } fr
  */
 function registerPostCommitRoute(app, { eventStore, matcherCache } = {}) {
     /**
+     * The position of a commit is known as soon as `commit()` returns, so the response only waits for the
+     * commit callback when the client asks for an acknowledged write with `Prefer: respond-flushed`.
+     *
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
      * @returns {Promise<void>}
@@ -27,8 +33,18 @@ function registerPostCommitRoute(app, { eventStore, matcherCache } = {}) {
             ? parseCondition(body.condition, matcherCache)
             : parseExpectedVersion(body.expectedVersion);
         const metadata = body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? body.metadata : {};
-        const commit = await commitAsync(eventStore, streamName, body.events, expectedVersion, metadata);
-        sendJson(response, 201, commit);
+        let acknowledge;
+        const acknowledged = new Promise(resolve => {
+            acknowledge = resolve;
+        });
+        const commit = eventStore.commit(streamName, body.events, expectedVersion, metadata, acknowledge);
+        const headers = { [POSITION_HEADER]: String(commitPosition(commit)) };
+        if (!hasPreference(request, RESPOND_FLUSHED)) {
+            sendJson(response, 202, commit, headers);
+            return;
+        }
+        await acknowledged;
+        sendJson(response, 201, commit, { ...headers, 'preference-applied': RESPOND_FLUSHED });
     };
 
     app.post(/^\/streams\/(.+)\/commit$/, handlePostCommit);

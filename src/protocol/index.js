@@ -4,5 +4,5 @@
  * code.
  */
 export { CommitConditionHelper, MatcherBuilder, CONDITION_HEADER } from './CommitConditionHelper.js';
-export { eventPosition, commitPosition } from './positions.js';
+export { POSITION_HEADER, eventPosition, commitPosition } from './positions.js';
 export { NdjsonDecoder } from './ndjson.js';

@@ -78,7 +78,7 @@ The package is split into three layers so client-only code never pulls in `expre
 
 | Import | Loads | Contents |
 | --- | --- | --- |
-| `event-storage-http/protocol` | zero framework, zero server | `MatcherBuilder`, `CommitConditionHelper`, `CONDITION_HEADER`, `eventPosition`, `commitPosition`, `NdjsonDecoder` |
+| `event-storage-http/protocol` | zero framework, zero server | `MatcherBuilder`, `CommitConditionHelper`, `CONDITION_HEADER`, `POSITION_HEADER`, `eventPosition`, `commitPosition`, `NdjsonDecoder` |
 | `event-storage-http/client` | zero server, zero `express` | `HttpEventStream`, `EventStoreHttpClient` (plus the protocol helpers re-exported) |
 | `event-storage-http` | full server stack incl. `express` | `EventStoreHttpApi`, `createEventStoreHttpServer`, `createEventStoreHttpServerWithApp` (plus all of the above, for backwards compatibility) |
 
@@ -216,6 +216,15 @@ Query responses also expose a serialized optimistic-concurrency condition in the
   "metadata": { "requestId": "req-1" }
 }
 ```
+
+The response body is the commit (`commitId`, `committedAt`, `streamName`, `streamVersion`, `events` and the metadata), and the `x-event-store-position` header carries the global position after its last event (`commitPosition(commit)`). By default the server answers as soon as the commit has its position, before the store acknowledged the write:
+
+| Request | Answers when | Status | `Preference-Applied` |
+|---------|--------------|--------|----------------------|
+| no preference | the events are in the write buffer | `202 Accepted` | — |
+| `Prefer: respond-flushed` | the commit callback fired, i.e. the write is acknowledged with the store's durability setting | `201 Created` | `respond-flushed` |
+
+A `202` commit is readable right away, but it is lost if the server process dies before the write buffer is flushed. The store reports write errors by throwing from its flush, not through the commit callback, so no error status can follow a `202`. With `respond-flushed` such a response is never completed, and the client sees the connection drop when the server process goes down. Use `respond-flushed` when the caller needs the write to be safe before it continues, e.g. before it acknowledges a command to its own caller. `client.commit(stream, events, { flushed: true })` sends the preference.
 
 `PUT /streams/{stream}` creates a stream index (matcher stream).
 

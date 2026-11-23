@@ -69,7 +69,9 @@ test('POST /streams/:stream/commit stores events and GET /streams/:stream/versio
                 metadata: { requestId: 'req-1' }
             })
         });
-        assert.equal(commitResponse.status, 201);
+        assert.equal(commitResponse.status, 202);
+        assert.equal(commitResponse.headers.get('x-event-store-position'), '2');
+        assert.equal(commitResponse.headers.get('preference-applied'), null);
         const commit = await commitResponse.json();
         assert.equal(commit.streamName, 'orders-1');
         assert.equal(commit.events.length, 2);
@@ -80,6 +82,49 @@ test('POST /streams/:stream/commit stores events and GET /streams/:stream/versio
             stream: 'orders-1',
             version: 2
         });
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+function postCommitAndRecordAcknowledgement(fixture, headers = {}) {
+    let acknowledged = false;
+    fixture.eventStore.once('commit', () => {
+        acknowledged = true;
+    });
+    return fetch(`${fixture.baseUrl}/streams/orders-1/commit`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify({ events: [{ type: 'OrderPlaced', orderId: '1' }] })
+    }).then(response => ({ response, acknowledgedBeforeResponse: acknowledged }));
+}
+
+test('POST /streams/:stream/commit answers before the write is acknowledged by default', async () => {
+    const fixture = await createFixture({ eventStoreConfig: { storageConfig: { syncInterval: 200 } } });
+    try {
+        const { response, acknowledgedBeforeResponse } = await postCommitAndRecordAcknowledgement(fixture);
+        assert.equal(response.status, 202);
+        assert.equal(acknowledgedBeforeResponse, false);
+        assert.equal(response.headers.get('x-event-store-position'), '1');
+
+        const versionResponse = await fetch(`${fixture.baseUrl}/streams/orders-1/version`);
+        assert.equal((await versionResponse.json()).version, 1);
+    } finally {
+        await destroyFixture(fixture);
+    }
+});
+
+test('POST /streams/:stream/commit with Prefer: respond-flushed answers once the write is acknowledged', async () => {
+    const fixture = await createFixture({ eventStoreConfig: { storageConfig: { syncInterval: 200 } } });
+    try {
+        const { response, acknowledgedBeforeResponse } = await postCommitAndRecordAcknowledgement(fixture, {
+            prefer: 'return=minimal, Respond-Flushed; foo=bar'
+        });
+        assert.equal(response.status, 201);
+        assert.equal(acknowledgedBeforeResponse, true);
+        assert.equal(response.headers.get('preference-applied'), 'respond-flushed');
+        assert.equal(response.headers.get('x-event-store-position'), '1');
+        assert.equal((await response.json()).streamVersion, 0);
     } finally {
         await destroyFixture(fixture);
     }
@@ -212,7 +257,7 @@ test('HTTP API validates stream names and consumer identifiers', async () => {
                 events: [{ type: 'OrderPlaced', orderId: 'safe-1' }]
             })
         });
-        assert.equal(validCommitResponse.status, 201);
+        assert.equal(validCommitResponse.status, 202);
 
         const validVersionResponse = await fetch(`${fixture.baseUrl}/streams/orders.v1/eu-1/version`);
         assert.equal(validVersionResponse.status, 200);

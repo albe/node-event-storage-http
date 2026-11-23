@@ -13,6 +13,7 @@ export {
     MatcherBuilder,
     CommitConditionHelper,
     CONDITION_HEADER,
+    POSITION_HEADER,
     NdjsonDecoder,
     eventPosition,
     commitPosition
@@ -81,6 +82,8 @@ export interface FollowOptions {
 export interface CommitOptions {
     condition?: object | null;
     metadata?: object | null;
+    /** Resolve only once the store acknowledged the write (`Prefer: respond-flushed`). */
+    flushed?: boolean;
     signal?: AbortSignal;
 }
 

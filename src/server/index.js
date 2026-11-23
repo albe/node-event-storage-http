@@ -18,5 +18,5 @@ export {
 export { default as StorageStatsCollector } from './StatsCollector.js';
 
 // Backwards-compatible re-exports of the lower layers.
-export { CommitConditionHelper, MatcherBuilder, CONDITION_HEADER, eventPosition, commitPosition, NdjsonDecoder } from '../protocol/index.js';
+export { CommitConditionHelper, MatcherBuilder, CONDITION_HEADER, POSITION_HEADER, eventPosition, commitPosition, NdjsonDecoder } from '../protocol/index.js';
 export { HttpEventStream, EventStoreHttpClient } from '../client/index.js';
