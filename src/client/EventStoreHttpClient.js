@@ -191,11 +191,11 @@ class EventStoreHttpClient {
     /**
      * @param {string} stream Target stream name.
      * @param {object[]} events Events to append.
-     * @param {{condition?: object|null, metadata?: object|null, flushed?: boolean, signal?: AbortSignal}} [options={}] Commit options.
-     *   With `flushed`, the promise only resolves once the store acknowledged the write.
+     * @param {{condition?: object|null, metadata?: object|null, unflushed?: boolean, signal?: AbortSignal}} [options={}] Commit options.
+     *   With `unflushed`, the promise resolves as soon as the commit has its position, before the store acknowledged the write.
      * @returns {Promise<object>} The commit result.
      */
-    async commit(stream, events, { condition = null, metadata = null, flushed = false, signal } = {}) {
+    async commit(stream, events, { condition = null, metadata = null, unflushed = false, signal } = {}) {
         // The commit route reads `condition`/`metadata` from the JSON body.
         const payload = { events };
         if (condition) {
@@ -205,8 +205,8 @@ class EventStoreHttpClient {
             payload.metadata = metadata;
         }
         const headers = { 'Content-Type': 'application/json' };
-        if (flushed) {
-            headers.Prefer = 'respond-flushed';
+        if (unflushed) {
+            headers.Prefer = 'respond-unflushed';
         }
         const res = await this._request('POST', `/streams/${encodeURIComponent(stream)}/commit`, {
             headers,

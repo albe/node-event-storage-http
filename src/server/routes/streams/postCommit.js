@@ -2,7 +2,18 @@ import { HttpError, sendJson } from '../../http/errors.js';
 import { hasPreference, parseCondition, parseExpectedVersion, parseStreamName } from '../../http/routeUtils.js';
 import { commitPosition, POSITION_HEADER } from '../../../protocol/index.js';
 
-const RESPOND_FLUSHED = 'respond-flushed';
+const RESPOND_UNFLUSHED = 'respond-unflushed';
+
+/**
+ * @param {import('express').Response} response Express response.
+ * @param {number} status HTTP status code.
+ * @param {object} commit The commit returned by or passed to `eventStore.commit()`.
+ * @param {Record<string, string>} [headers={}] Extra headers.
+ * @returns {void}
+ */
+function sendCommit(response, status, commit, headers = {}) {
+    sendJson(response, status, commit, { [POSITION_HEADER]: String(commitPosition(commit)), ...headers });
+}
 
 /**
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
@@ -12,8 +23,9 @@ const RESPOND_FLUSHED = 'respond-flushed';
  */
 function registerPostCommitRoute(app, { eventStore, matcherCache } = {}) {
     /**
-     * The position of a commit is known as soon as `commit()` returns, so the response only waits for the
-     * commit callback when the client asks for an acknowledged write with `Prefer: respond-flushed`.
+     * The response waits for the commit callback, i.e. the acknowledged write. The position of a commit is already
+     * known when `commit()` returns, so a client that only needs the position can skip the wait with
+     * `Prefer: respond-unflushed`.
      *
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
@@ -38,13 +50,11 @@ function registerPostCommitRoute(app, { eventStore, matcherCache } = {}) {
             acknowledge = resolve;
         });
         const commit = eventStore.commit(streamName, body.events, expectedVersion, metadata, acknowledge);
-        const headers = { [POSITION_HEADER]: String(commitPosition(commit)) };
-        if (!hasPreference(request, RESPOND_FLUSHED)) {
-            sendJson(response, 202, commit, headers);
+        if (hasPreference(request, RESPOND_UNFLUSHED)) {
+            sendCommit(response, 202, commit, { 'preference-applied': RESPOND_UNFLUSHED });
             return;
         }
-        await acknowledged;
-        sendJson(response, 201, commit, { ...headers, 'preference-applied': RESPOND_FLUSHED });
+        sendCommit(response, 201, await acknowledged);
     };
 
     app.post(/^\/streams\/(.+)\/commit$/, handlePostCommit);

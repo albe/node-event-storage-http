@@ -97,7 +97,7 @@ test('client round-trips against a server built with createEventStoreHttpServerW
     }
 });
 
-test('client.commit with flushed asks the server to wait for the acknowledged write', async () => {
+test('client.commit with unflushed asks the server not to wait for the acknowledged write', async () => {
     const requests = [];
     const client = new EventStoreHttpClient({
         baseUrl: 'http://store.test',
@@ -107,10 +107,10 @@ test('client.commit with flushed asks the server to wait for the acknowledged wr
         }
     });
 
-    await client.commit('orders', [{ type: 'OrderPlaced' }], { flushed: true });
+    await client.commit('orders', [{ type: 'OrderPlaced' }], { unflushed: true });
     await client.commit('orders', [{ type: 'OrderPlaced' }]);
 
-    assert.equal(requests[0].Prefer, 'respond-flushed');
+    assert.equal(requests[0].Prefer, 'respond-unflushed');
     assert.equal(requests[1].Prefer, undefined);
 });
 

@@ -82,8 +82,8 @@ export interface FollowOptions {
 export interface CommitOptions {
     condition?: object | null;
     metadata?: object | null;
-    /** Resolve only once the store acknowledged the write (`Prefer: respond-flushed`). */
-    flushed?: boolean;
+    /** Resolve as soon as the commit has its position, before the store acknowledged the write (`Prefer: respond-unflushed`). */
+    unflushed?: boolean;
     signal?: AbortSignal;
 }
 
