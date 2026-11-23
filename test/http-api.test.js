@@ -102,7 +102,9 @@ function postCommitAndRecordAcknowledgement(fixture, headers = {}) {
 test('POST /streams/:stream/commit answers before the write is acknowledged by default', async () => {
     const fixture = await createFixture({ eventStoreConfig: { storageConfig: { syncInterval: 200 } } });
     try {
-        const { response, acknowledgedBeforeResponse } = await postCommitAndRecordAcknowledgement(fixture);
+        const { response, acknowledgedBeforeResponse } = await postCommitAndRecordAcknowledgement(fixture, {
+            prefer: 'extension="x,respond-flushed;\\"foo"'
+        });
         assert.equal(response.status, 202);
         assert.equal(acknowledgedBeforeResponse, false);
         assert.equal(response.headers.get('x-event-store-position'), '1');

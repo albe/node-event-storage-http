@@ -395,6 +395,7 @@ function splitConsumerStreamPath(rawPath) {
 
 /**
  * Prefer header values are comma-separated preferences, each optionally followed by `=value` or `;parameters` (RFC 7240).
+ * Quoted values are blanked first, so a comma or token inside them is not taken for a preference.
  *
  * @param {import('express').Request} request Express request.
  * @param {string} name Lower-case preference token.
@@ -405,7 +406,7 @@ function hasPreference(request, name) {
     if (!header) {
         return false;
     }
-    return header.split(',').some(preference => preference.split(/[=;]/)[0].trim().toLowerCase() === name);
+    return header.replace(/"(?:[^"\\]|\\.)*"/g, '""').split(',').some(preference => preference.split(/[=;]/)[0].trim().toLowerCase() === name);
 }
 
 /**
