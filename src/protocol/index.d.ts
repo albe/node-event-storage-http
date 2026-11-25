@@ -48,6 +48,9 @@ export class CommitConditionHelper {
     static toHeaders(condition: SerializedCommitCondition): Record<'x-event-store-query-condition', string>;
 }
 
+/** Response header of a commit that carries the global position it reached (see `commitPosition`). */
+export const POSITION_HEADER: 'x-event-store-position';
+
 /** Compute the 1-based global position immediately after a persisted event. */
 export function eventPosition(event: { commitId: number; commitVersion: number }): number;
 

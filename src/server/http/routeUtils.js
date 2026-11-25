@@ -394,21 +394,19 @@ function splitConsumerStreamPath(rawPath) {
 }
 
 /**
- * @param {import('event-storage').EventStore} eventStore EventStore instance.
- * @param {string} streamName Target stream name.
- * @param {object[]|object} events Events to commit.
- * @param {number|CommitCondition} expectedVersion Expected version / condition.
- * @param {object|undefined} metadata Commit metadata.
- * @returns {Promise<object>} Commit object.
+ * Prefer header values are comma-separated preferences, each optionally followed by `=value` or `;parameters` (RFC 7240).
+ * Quoted values are blanked first, so a comma or token inside them is not taken for a preference.
+ *
+ * @param {import('express').Request} request Express request.
+ * @param {string} name Lower-case preference token.
+ * @returns {boolean} Whether the client sent the preference.
  */
-function commitAsync(eventStore, streamName, events, expectedVersion, metadata) {
-    return new Promise((resolve, reject) => {
-        try {
-            eventStore.commit(streamName, events, expectedVersion, metadata, resolve);
-        } catch (error) {
-            reject(error);
-        }
-    });
+function hasPreference(request, name) {
+    const header = request.get('prefer');
+    if (!header) {
+        return false;
+    }
+    return header.replace(/"(?:[^"\\]|\\.)*"/g, '""').split(',').some(preference => preference.split(/[=;]/)[0].trim().toLowerCase() === name);
 }
 
 /**
@@ -465,10 +463,10 @@ function buildConsumerName(stream, identifier) {
 export {
     buildReadWindow,
     buildConsumerName,
-    commitAsync,
     collectSelectorLeaves,
     createMatcherCache,
     getQueryValues,
+    hasPreference,
     parseCondition,
     parseExpectedVersion,
     parseMatcher,

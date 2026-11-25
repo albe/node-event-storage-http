@@ -1,5 +1,19 @@
 import { HttpError, sendJson } from '../../http/errors.js';
-import { commitAsync, parseCondition, parseExpectedVersion, parseStreamName } from '../../http/routeUtils.js';
+import { hasPreference, parseCondition, parseExpectedVersion, parseStreamName } from '../../http/routeUtils.js';
+import { commitPosition, POSITION_HEADER } from '../../../protocol/index.js';
+
+const RESPOND_UNFLUSHED = 'respond-unflushed';
+
+/**
+ * @param {import('express').Response} response Express response.
+ * @param {number} status HTTP status code.
+ * @param {object} commit The commit returned by or passed to `eventStore.commit()`.
+ * @param {Record<string, string>} [headers={}] Extra headers.
+ * @returns {void}
+ */
+function sendCommit(response, status, commit, headers = {}) {
+    sendJson(response, status, commit, { [POSITION_HEADER]: String(commitPosition(commit)), ...headers });
+}
 
 /**
  * @param {import('express').Express} app Express app instance (must not be null/undefined).
@@ -9,6 +23,10 @@ import { commitAsync, parseCondition, parseExpectedVersion, parseStreamName } fr
  */
 function registerPostCommitRoute(app, { eventStore, matcherCache } = {}) {
     /**
+     * The response waits for the commit callback, i.e. the acknowledged write. The position of a commit is already
+     * known when `commit()` returns, so a client that only needs the position can skip the wait with
+     * `Prefer: respond-unflushed`.
+     *
      * @param {import('express').Request} request Express request.
      * @param {import('express').Response} response Express response.
      * @returns {Promise<void>}
@@ -27,8 +45,16 @@ function registerPostCommitRoute(app, { eventStore, matcherCache } = {}) {
             ? parseCondition(body.condition, matcherCache)
             : parseExpectedVersion(body.expectedVersion);
         const metadata = body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? body.metadata : {};
-        const commit = await commitAsync(eventStore, streamName, body.events, expectedVersion, metadata);
-        sendJson(response, 201, commit);
+        let acknowledge;
+        const acknowledged = new Promise(resolve => {
+            acknowledge = resolve;
+        });
+        const commit = eventStore.commit(streamName, body.events, expectedVersion, metadata, acknowledge);
+        if (hasPreference(request, RESPOND_UNFLUSHED)) {
+            sendCommit(response, 202, commit, { 'preference-applied': RESPOND_UNFLUSHED });
+            return;
+        }
+        sendCommit(response, 201, await acknowledged);
     };
 
     app.post(/^\/streams\/(.+)\/commit$/, handlePostCommit);

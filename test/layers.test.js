@@ -97,6 +97,23 @@ test('client round-trips against a server built with createEventStoreHttpServerW
     }
 });
 
+test('client.commit with unflushed asks the server not to wait for the acknowledged write', async () => {
+    const requests = [];
+    const client = new EventStoreHttpClient({
+        baseUrl: 'http://store.test',
+        fetch: async (url, init) => {
+            requests.push(init.headers);
+            return new Response('{}', { status: 201 });
+        }
+    });
+
+    await client.commit('orders', [{ type: 'OrderPlaced' }], { unflushed: true });
+    await client.commit('orders', [{ type: 'OrderPlaced' }]);
+
+    assert.equal(requests[0].Prefer, 'respond-unflushed');
+    assert.equal(requests[1].Prefer, undefined);
+});
+
 test('client.readJoin supports nested selector algebra', async () => {
     const fixture = await createFixture({ tagsAccessor: 'tags' });
     try {

@@ -7,6 +7,9 @@
  * underlying `event-storage` package.
  */
 
+/** Response header of a commit that carries the global position it reached. */
+const POSITION_HEADER = 'x-event-store-position';
+
 /**
  * Compute the global position of a single persisted event.
  *
@@ -28,4 +31,4 @@ function commitPosition(commitResult) {
     return commitResult.commitId + commitResult.events.length;
 }
 
-export { eventPosition, commitPosition };
+export { POSITION_HEADER, eventPosition, commitPosition };
