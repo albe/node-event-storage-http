@@ -2,7 +2,7 @@
 
 HTTP API layer for [`event-storage`](https://www.npmjs.com/package/event-storage) — exposes an EventStore instance as a set of REST endpoints over NDJSON streaming.
 
-Requires `event-storage >= 1.4.0`.
+Requires `event-storage >= 1.5.1`.
 
 ## What and why
 
@@ -224,7 +224,7 @@ The response body is the commit (`commitId`, `committedAt`, `streamName`, `strea
 | no preference | the commit callback fired, i.e. the write is acknowledged with the store's durability setting | `201 Created` | — |
 | `Prefer: respond-unflushed` | the events are in the write buffer and have their position | `202 Accepted` | `respond-unflushed` |
 
-A `202` commit is readable right away, but it is lost if the server process dies before the write buffer is flushed. The store reports write errors by throwing from its flush, not through the commit callback, so no error status can follow a `202`. Without the preference such a response is never completed, and the client sees the connection drop when the server process goes down. `client.commit(stream, events, { unflushed: true })` sends the preference. `respond-unflushed` needs `event-storage` 1.5.1 or later.
+A `202` commit is readable right away, but it is lost if the server process dies before the write buffer is flushed. The store reports write errors by throwing from its flush, not through the commit callback, so no error status can follow a `202`. Without the preference such a response is never completed, and the client sees the connection drop when the server process goes down. `client.commit(stream, events, { unflushed: true })` sends the preference.
 
 `PUT /streams/{stream}` creates a stream index (matcher stream).
 
